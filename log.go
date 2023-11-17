@@ -17,7 +17,7 @@ func (l LogName) String() string {
 type LogInfoEXECSQL struct {
 	Context      context.Context
 	SQL          string    `json:"sql"`
-	Result       []byte    `json:"result"`
+	Result       string    `json:"result"`
 	Err          error     `json:"error"`
 	BeginAt      time.Time `json:"beginAt"`
 	EndAt        time.Time `json:"endAt"`

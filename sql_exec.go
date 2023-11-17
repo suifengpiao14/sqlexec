@@ -6,15 +6,14 @@ import (
 	"encoding/json"
 	"net"
 	"reflect"
-	"strconv"
 	"sync"
 	"time"
 
 	"github.com/blastrain/vitess-sqlparser/sqlparser"
 	_ "github.com/go-sql-driver/mysql"
+	"github.com/jmoiron/sqlx"
 	"github.com/pkg/errors"
 	"github.com/spf13/cast"
-	"github.com/suifengpiao14/cudevent/cudeventimpl"
 	"github.com/suifengpiao14/funcs"
 	"github.com/suifengpiao14/logchan/v2"
 	"github.com/tidwall/gjson"
@@ -78,34 +77,41 @@ func (e *ExecutorSQL) GetDB() (db *sql.DB) {
 }
 
 func (e *ExecutorSQL) ExecOrQueryContext(ctx context.Context, sqls string, out interface{}) (err error) {
-	b, err := execOrQueryContext(ctx, e.GetDB(), sqls)
+	str, err := ExecOrQueryContext(ctx, e.GetDB(), sqls)
 	if err != nil {
 		return err
 	}
-	if b == nil {
-		return
-	}
-
-	rt := reflect.Indirect(reflect.ValueOf(out)).Type()
-	switch rt.Kind() {
-	case reflect.Map, reflect.Struct:
-		result := gjson.ParseBytes(b)
-		if result.IsArray() {
-			str := result.Get("@this.0").String()
-			b = []byte(str)
-		}
-	}
-	err = json.Unmarshal(b, out)
+	err = Byte2Struct([]byte(str), out)
 	if err != nil {
 		return err
 	}
 	return nil
+}
 
+func Byte2Struct(data []byte, dst any) (err error) {
+	if data == nil {
+		return nil
+	}
+	rt := reflect.Indirect(reflect.ValueOf(dst)).Type()
+	str := string(data)
+	switch rt.Kind() {
+	case reflect.Map, reflect.Struct:
+		result := gjson.Parse(str)
+		if result.IsArray() {
+			str = result.Get("@this.0").String()
+		}
+	}
+	b := []byte(str)
+	err = json.Unmarshal(b, dst)
+	if err != nil {
+		return err
+	}
+	return nil
 }
 
 var execOrQueryContextSingleflight = new(singleflight.Group)
 
-func execOrQueryContext(ctx context.Context, sqlDB *sql.DB, sqls string) (out []byte, err error) {
+func ExecOrQueryContext(ctx context.Context, sqlDB *sql.DB, sqls string) (out string, err error) {
 	sqlLogInfo := &LogInfoEXECSQL{}
 	defer func() {
 		sqlLogInfo.Err = err
@@ -114,45 +120,37 @@ func execOrQueryContext(ctx context.Context, sqlDB *sql.DB, sqls string) (out []
 	sqls = funcs.StandardizeSpaces(funcs.TrimSpaces(sqls)) // 格式化sql语句
 	stmt, err := sqlparser.Parse(sqls)
 	if err != nil {
-		return nil, errors.WithMessage(err, sqls)
+		return "", errors.WithMessage(err, sqls)
 	}
 	sqlLogInfo.SQL = sqls
-	switch stmt := stmt.(type) {
+	switch stmt.(type) {
 	case *sqlparser.Select:
 		return QueryContext(ctx, sqlDB, sqls)
 	case *sqlparser.Update:
-		selectSQL := cudeventimpl.ConvertUpdateToSelect(stmt)
-		before, err := QueryContext(ctx, sqlDB, selectSQL)
+		_, rowsAffected, err := ExecContext(ctx, sqlDB, sqls)
 		if err != nil {
-			return nil, err
+			return "", err
 		}
-		sqlRawEvent := &cudeventimpl.SQLRawEvent{
-			BeforeData: before,
-		}
-		_, rowsAffected, err := ExecContext(ctx, sqlDB, sqls, sqlRawEvent)
-		if err != nil {
-			return nil, err
-		}
-		return []byte(strconv.FormatInt(rowsAffected, 10)), nil
+		return cast.ToString(rowsAffected), nil
 	case *sqlparser.Insert:
-		lastInsertId, _, err := ExecContext(ctx, sqlDB, sqls, nil)
+		lastInsertId, _, err := ExecContext(ctx, sqlDB, sqls)
 		if err != nil {
-			return nil, err
+			return "", err
 		}
-		return []byte(strconv.FormatInt(lastInsertId, 10)), nil
+		return cast.ToString(lastInsertId), nil
 
 	case *sqlparser.Delete:
-		_, rowsAffected, err := ExecContext(ctx, sqlDB, sqls, nil)
+		_, rowsAffected, err := ExecContext(ctx, sqlDB, sqls)
 		if err != nil {
-			return nil, err
+			return "", err
 		}
-		return []byte(strconv.FormatInt(rowsAffected, 10)), nil
+		return cast.ToString(rowsAffected), nil
 	}
 
 	return out, nil
 }
 
-func ExecContext(ctx context.Context, sqlDB *sql.DB, sqls string, sqlRawEvent *cudeventimpl.SQLRawEvent) (lastInsertId int64, rowsAffected int64, err error) {
+func ExecContext(ctx context.Context, sqlDB *sql.DB, sqls string) (lastInsertId int64, rowsAffected int64, err error) {
 	sqlLogInfo := &LogInfoEXECSQL{
 		SQL: sqls,
 	}
@@ -160,16 +158,6 @@ func ExecContext(ctx context.Context, sqlDB *sql.DB, sqls string, sqlRawEvent *c
 		sqlLogInfo.Err = err
 		logchan.SendLogInfo(sqlLogInfo)
 	}()
-
-	if sqlRawEvent == nil {
-		sqlRawEvent = &cudeventimpl.SQLRawEvent{}
-	}
-	sqlRawEvent.DBExecutorGetter = func() (dbExecutor cudeventimpl.DBExecutor) {
-		return &ExecutorSQL{
-			_db: sqlDB,
-		}
-	}
-	sqlRawEvent.SQL = sqls
 
 	sqlLogInfo.BeginAt = time.Now().Local()
 	res, err := sqlDB.ExecContext(ctx, sqls)
@@ -179,16 +167,14 @@ func ExecContext(ctx context.Context, sqlDB *sql.DB, sqls string, sqlRawEvent *c
 	sqlLogInfo.EndAt = time.Now().Local()
 	lastInsertId, _ = res.LastInsertId()
 	rowsAffected, _ = res.RowsAffected()
+
 	sqlLogInfo.RowsAffected = rowsAffected
 	sqlLogInfo.LastInsertId = lastInsertId
-	sqlRawEvent.RowsAffected = rowsAffected
-	sqlRawEvent.LastInsertId = lastInsertId
-	cudeventimpl.PublishSQLRawEventAsync(sqlRawEvent)
 	return lastInsertId, rowsAffected, nil
 
 }
 
-func QueryContext(ctx context.Context, sqlDB *sql.DB, sqls string) (out []byte, err error) {
+func QueryContext(ctx context.Context, sqlDB *sql.DB, sqls string) (out string, err error) {
 	sqlLogInfo := &LogInfoEXECSQL{
 		SQL: sqls,
 	}
@@ -202,7 +188,7 @@ func QueryContext(ctx context.Context, sqlDB *sql.DB, sqls string) (out []byte, 
 		rows, err := sqlDB.QueryContext(ctx, sqls)
 		sqlLogInfo.EndAt = time.Now().Local()
 		if err != nil {
-			return "", err
+			return out, err
 		}
 		defer func() {
 			err := rows.Close()
@@ -212,25 +198,15 @@ func QueryContext(ctx context.Context, sqlDB *sql.DB, sqls string) (out []byte, 
 		}()
 		allResult := make([][]map[string]string, 0)
 		rowsAffected := 0
-		columnTypes, err := rows.ColumnTypes()
-		if err != nil {
-			return "", err
-		}
-		for _, columnType := range columnTypes {
-			dbType := columnType.DatabaseTypeName()
-			dbName := columnType.Name()
-			_ = dbType
-			_ = dbName
-		}
 		for {
 			records := make([]map[string]string, 0)
 			for rows.Next() {
 				rowsAffected++
 				var record = make(map[string]interface{})
 				var recordStr = make(map[string]string)
-				err := MapScan(rows, record)
+				err := sqlx.MapScan(rows, record)
 				if err != nil {
-					return "", err
+					return out, err
 				}
 				for k, v := range record {
 					recordStr[k] = cast.ToString(v)
@@ -247,7 +223,7 @@ func QueryContext(ctx context.Context, sqlDB *sql.DB, sqls string) (out []byte, 
 		if len(allResult) == 1 { // allResult 初始值为[[]],至少有一个元素
 			result := allResult[0]
 			if len(result) == 0 { // 结果为空，返回空字符串
-				return "", nil
+				return out, nil
 			}
 			if len(result) == 1 && len(result[0]) == 1 {
 				row := result[0]
@@ -255,50 +231,27 @@ func QueryContext(ctx context.Context, sqlDB *sql.DB, sqls string) (out []byte, 
 					return val, nil // 只有一个值时，直接返回值本身
 				}
 			}
-			out, err = json.Marshal(result)
+			b, err := json.Marshal(result)
 			if err != nil {
-				return "", err
+				return out, err
 			}
+			out = string(b)
 			sqlLogInfo.Result = out
 			return out, nil
 		}
 
 		jsonByte, err := json.Marshal(allResult)
 		if err != nil {
-			return "", err
+			return out, err
 		}
-		sqlLogInfo.Result = jsonByte
+		out = string(jsonByte)
+		sqlLogInfo.Result = out
 
 		return out, nil
 	})
 	if err != nil {
-		return nil, err
+		return out, err
 	}
-	out = v.([]byte)
+	out = v.(string)
 	return out, nil
-}
-
-// MapScan copy sqlx
-func MapScan(r *sql.Rows, dest map[string]interface{}) error {
-	// ignore r.started, since we needn't use reflect for anything.
-	columns, err := r.Columns()
-	if err != nil {
-		return err
-	}
-
-	values := make([]interface{}, len(columns))
-	for i := range values {
-		values[i] = new(interface{})
-	}
-
-	err = r.Scan(values...)
-	if err != nil {
-		return err
-	}
-
-	for i, column := range columns {
-		dest[column] = *(values[i].(*interface{}))
-	}
-
-	return r.Err()
 }
