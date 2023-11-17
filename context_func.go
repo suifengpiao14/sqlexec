@@ -1,9 +1,6 @@
 package sqlstream
 
 import (
-	"context"
-	"database/sql"
-
 	"github.com/pkg/errors"
 )
 
@@ -15,6 +12,7 @@ var (
 	CONTEXT_NOT_EXCEPT               = errors.New("not except type")
 )
 
+/*
 func setDBToContext(ctx context.Context, db *sql.DB) (newCtx context.Context) {
 	if ctx == nil {
 		ctx = context.Background()
@@ -37,3 +35,4 @@ func GetDBFromContext(ctx context.Context) (db *sql.DB, err error) {
 	}
 	return db, nil
 }
+*/
