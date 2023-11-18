@@ -92,7 +92,8 @@ func Byte2Struct(data []byte, dst any) (err error) {
 	if data == nil {
 		return nil
 	}
-	rt := reflect.Indirect(reflect.ValueOf(dst)).Type()
+	rv := reflect.Indirect(reflect.ValueOf(dst))
+	rt := rv.Type()
 	str := string(data)
 	switch rt.Kind() {
 	case reflect.Map, reflect.Struct:
@@ -133,11 +134,20 @@ func ExecOrQueryContext(ctx context.Context, sqlDB *sql.DB, sqls string) (out st
 		}
 		return cast.ToString(rowsAffected), nil
 	case *sqlparser.Insert:
-		lastInsertId, _, err := ExecContext(ctx, sqlDB, sqls)
+		lastInsertId, rowsAffected, err := ExecContext(ctx, sqlDB, sqls)
 		if err != nil {
 			return "", err
 		}
-		return cast.ToString(lastInsertId), nil
+		insertIdArr := make([]string, 0)
+		for i := int64(0); i < rowsAffected; i++ {
+			insertIdArr = append(insertIdArr, cast.ToString(lastInsertId+i))
+		}
+		b, err := json.Marshal(insertIdArr)
+		if err != nil {
+			return "", err
+		}
+		out = string(b)
+		return out, nil
 
 	case *sqlparser.Delete:
 		_, rowsAffected, err := ExecContext(ctx, sqlDB, sqls)

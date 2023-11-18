@@ -12,7 +12,7 @@ require (
 	github.com/stretchr/testify v1.8.4
 	github.com/suifengpiao14/funcs v0.0.16
 	github.com/suifengpiao14/logchan/v2 v2.0.22
-	github.com/suifengpiao14/stream v0.0.15
+	github.com/suifengpiao14/stream v0.0.16
 	github.com/tidwall/gjson v1.17.0
 	golang.org/x/crypto v0.15.0
 	golang.org/x/sync v0.5.0
