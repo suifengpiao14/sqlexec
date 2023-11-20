@@ -90,7 +90,7 @@ func connectDB(cfg DBConfig, sshConfig *SSHConfig) (db *sql.DB, err error) {
 }
 
 func Byte2Struct(data []byte, dst any) (err error) {
-	if data == nil {
+	if len(data) == 0 {
 		return nil
 	}
 	rv := reflect.Indirect(reflect.ValueOf(dst))
