@@ -27,26 +27,26 @@ type DBConfig struct {
 	MaxOpen     int    `json:"maxOpen"`
 	MaxIdle     int    `json:"maxIdle"`
 	MaxIdleTime int    `json:"maxIdleTime"`
-	SSHConfig   *SSHConfig
 }
 
 type ExecutorSQL struct {
-	config DBConfig
-	_db    *sql.DB
-	once   sync.Once
+	dbConfig  DBConfig
+	sshConfig *SSHConfig
+	_db       *sql.DB
+	once      sync.Once
 }
 
-func NewExecutorSQL(dbConfig DBConfig) (e *ExecutorSQL) {
+func NewExecutorSQL(dbConfig DBConfig, sshConfig *SSHConfig) (e *ExecutorSQL) {
 	return &ExecutorSQL{
-		config: dbConfig,
+		dbConfig: dbConfig,
 	}
 }
 
 var DriverName = "mysql"
 
-func connectDB(cfg DBConfig) (db *sql.DB, err error) {
-	if cfg.SSHConfig != nil {
-		db, err = cfg.SSHConfig.Tunnel(cfg.DSN)
+func connectDB(cfg DBConfig, sshConfig *SSHConfig) (db *sql.DB, err error) {
+	if sshConfig != nil {
+		db, err = sshConfig.Tunnel(cfg.DSN)
 	} else {
 		db, err = sql.Open(DriverName, cfg.DSN)
 	}
@@ -55,13 +55,13 @@ func connectDB(cfg DBConfig) (db *sql.DB, err error) {
 
 func (e *ExecutorSQL) GetDB() (db *sql.DB) {
 	e.once.Do(func() {
-		cfg := e.config
-		db, err := connectDB(cfg)
+		cfg := e.dbConfig
+		db, err := connectDB(cfg, e.sshConfig)
 		if err != nil {
 			if errors.Is(err, &net.OpError{}) {
 				err = nil
 				time.Sleep(100 * time.Millisecond)
-				db, err = connectDB(cfg)
+				db, err = connectDB(cfg, e.sshConfig)
 			}
 		}
 		if err != nil {
