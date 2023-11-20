@@ -38,19 +38,9 @@ type ExecutorSQL struct {
 
 func NewExecutorSQL(dbConfig DBConfig, sshConfig *SSHConfig) (e *ExecutorSQL) {
 	return &ExecutorSQL{
-		dbConfig: dbConfig,
+		dbConfig:  dbConfig,
+		sshConfig: sshConfig,
 	}
-}
-
-var DriverName = "mysql"
-
-func connectDB(cfg DBConfig, sshConfig *SSHConfig) (db *sql.DB, err error) {
-	if sshConfig != nil {
-		db, err = sshConfig.Tunnel(cfg.DSN)
-	} else {
-		db, err = sql.Open(DriverName, cfg.DSN)
-	}
-	return db, err
 }
 
 func (e *ExecutorSQL) GetDB() (db *sql.DB) {
@@ -86,6 +76,17 @@ func (e *ExecutorSQL) ExecOrQueryContext(ctx context.Context, sqls string, out i
 		return err
 	}
 	return nil
+}
+
+var DriverName = "mysql"
+
+func connectDB(cfg DBConfig, sshConfig *SSHConfig) (db *sql.DB, err error) {
+	if sshConfig != nil {
+		db, err = sshConfig.Tunnel(cfg.DSN)
+	} else {
+		db, err = sql.Open(DriverName, cfg.DSN)
+	}
+	return db, err
 }
 
 func Byte2Struct(data []byte, dst any) (err error) {
