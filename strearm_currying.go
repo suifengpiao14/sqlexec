@@ -2,21 +2,20 @@ package sqlstream
 
 import (
 	"context"
-	"database/sql"
 
-	"github.com/pkg/errors"
 	"github.com/suifengpiao14/stream"
 )
 
+type Identity interface {
+	Identity() string
+}
+
 // MysqlPackHandler 执行sql获取返回
-func MysqlPackHandler(db *sql.DB) (packHandler stream.PackHandler) {
+func MysqlPackHandler(dbIdentity Identity) (packHandler stream.PackHandler) {
 	packHandler = stream.NewPackHandlerWithSetContext(nil, func(ctx context.Context, input []byte) (out []byte, err error) {
 		sql := string(input)
-		// if db == nil {
-		// 	db, _ = GetDBFromContext(ctx)
-		// }
-		if db == nil {
-			err = errors.New("db required")
+		db, err := GetDB(dbIdentity.Identity())
+		if err != nil {
 			return nil, err
 		}
 		data, err := ExecOrQueryContext(ctx, db, sql)

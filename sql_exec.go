@@ -90,6 +90,9 @@ func connectDB(cfg DBConfig, sshConfig *SSHConfig) (db *sql.DB, err error) {
 }
 
 func Byte2Struct(data []byte, dst any) (err error) {
+	if dst == nil {
+		return
+	}
 	if len(data) == 0 {
 		return nil
 	}
@@ -113,7 +116,7 @@ func Byte2Struct(data []byte, dst any) (err error) {
 
 var execOrQueryContextSingleflight = new(singleflight.Group)
 
-func ExecOrQueryContext(ctx context.Context, sqlDB *sql.DB, sqls string) (out string, err error) {
+func ExecOrQueryContext(ctx context.Context, db *sql.DB, sqls string) (out string, err error) {
 	sqlLogInfo := &LogInfoEXECSQL{}
 	defer func() {
 		sqlLogInfo.Err = err
@@ -127,15 +130,15 @@ func ExecOrQueryContext(ctx context.Context, sqlDB *sql.DB, sqls string) (out st
 	sqlLogInfo.SQL = sqls
 	switch stmt.(type) {
 	case *sqlparser.Select:
-		return QueryContext(ctx, sqlDB, sqls)
+		return QueryContext(ctx, db, sqls)
 	case *sqlparser.Update:
-		_, rowsAffected, err := ExecContext(ctx, sqlDB, sqls)
+		_, rowsAffected, err := ExecContext(ctx, db, sqls)
 		if err != nil {
 			return "", err
 		}
 		return cast.ToString(rowsAffected), nil
 	case *sqlparser.Insert:
-		lastInsertId, rowsAffected, err := ExecContext(ctx, sqlDB, sqls)
+		lastInsertId, rowsAffected, err := ExecContext(ctx, db, sqls)
 		if err != nil {
 			return "", err
 		}
@@ -151,7 +154,7 @@ func ExecOrQueryContext(ctx context.Context, sqlDB *sql.DB, sqls string) (out st
 		return out, nil
 
 	case *sqlparser.Delete:
-		_, rowsAffected, err := ExecContext(ctx, sqlDB, sqls)
+		_, rowsAffected, err := ExecContext(ctx, db, sqls)
 		if err != nil {
 			return "", err
 		}
@@ -161,7 +164,7 @@ func ExecOrQueryContext(ctx context.Context, sqlDB *sql.DB, sqls string) (out st
 	return out, nil
 }
 
-func ExecContext(ctx context.Context, sqlDB *sql.DB, sqls string) (lastInsertId int64, rowsAffected int64, err error) {
+func ExecContext(ctx context.Context, db *sql.DB, sqls string) (lastInsertId int64, rowsAffected int64, err error) {
 	sqlLogInfo := &LogInfoEXECSQL{
 		SQL: sqls,
 	}
@@ -171,7 +174,7 @@ func ExecContext(ctx context.Context, sqlDB *sql.DB, sqls string) (lastInsertId 
 	}()
 
 	sqlLogInfo.BeginAt = time.Now().Local()
-	res, err := sqlDB.ExecContext(ctx, sqls)
+	res, err := db.ExecContext(ctx, sqls)
 	if err != nil {
 		return 0, 0, err
 	}
@@ -185,7 +188,7 @@ func ExecContext(ctx context.Context, sqlDB *sql.DB, sqls string) (lastInsertId 
 
 }
 
-func QueryContext(ctx context.Context, sqlDB *sql.DB, sqls string) (out string, err error) {
+func QueryContext(ctx context.Context, db *sql.DB, sqls string) (out string, err error) {
 	sqlLogInfo := &LogInfoEXECSQL{
 		SQL: sqls,
 	}
@@ -196,7 +199,7 @@ func QueryContext(ctx context.Context, sqlDB *sql.DB, sqls string) (out string, 
 
 	v, err, _ := execOrQueryContextSingleflight.Do(sqls, func() (interface{}, error) {
 		sqlLogInfo.BeginAt = time.Now().Local()
-		rows, err := sqlDB.QueryContext(ctx, sqls)
+		rows, err := db.QueryContext(ctx, sqls)
 		sqlLogInfo.EndAt = time.Now().Local()
 		if err != nil {
 			return out, err
