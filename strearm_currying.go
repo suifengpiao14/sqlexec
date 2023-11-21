@@ -2,22 +2,19 @@ package sqlstream
 
 import (
 	"context"
+	"database/sql"
 
 	"github.com/suifengpiao14/stream"
 )
 
-type Identity interface {
-	Identity() string
+type GetDBI interface {
+	GetDB() *sql.DB
 }
 
 // MysqlPackHandler 执行sql获取返回
-func MysqlPackHandler(dbIdentity Identity) (packHandler stream.PackHandler) {
+func MysqlPackHandler(db *sql.DB) (packHandler stream.PackHandler) {
 	packHandler = stream.NewPackHandlerWithSetContext(nil, func(ctx context.Context, input []byte) (out []byte, err error) {
 		sql := string(input)
-		db, err := GetDB(dbIdentity.Identity())
-		if err != nil {
-			return nil, err
-		}
 		data, err := ExecOrQueryContext(ctx, db, sql)
 		if err != nil {
 			return nil, err
