@@ -9,8 +9,9 @@ import (
 
 var dbMap sync.Map
 
-func RegisterDB(identity string, db *sql.DB) {
+func RegisterDB(identity string, db *sql.DB) (err error) {
 	dbMap.Store(identity, db)
+	return nil
 }
 
 func GetDB(identify string) (db *sql.DB, err error) {
