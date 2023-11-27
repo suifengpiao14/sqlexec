@@ -23,15 +23,3 @@ func MysqlPackHandler(db *sql.DB) (packHandler stream.PackHandler) {
 	}, nil)
 	return packHandler
 }
-
-// Byte2StructPackHandler 将mysql数据转换为结构体
-func Byte2StructPackHandler(dst any) (packHandler stream.PackHandler) {
-	packHandler = stream.NewPackHandler(nil, func(ctx context.Context, input []byte) (out []byte, err error) {
-		err = Byte2Struct(input, dst)
-		if err != nil {
-			return nil, err
-		}
-		return nil, nil
-	})
-	return packHandler
-}

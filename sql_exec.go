@@ -71,7 +71,7 @@ func (e *ExecutorSQL) ExecOrQueryContext(ctx context.Context, sqls string, out i
 	if err != nil {
 		return err
 	}
-	err = Byte2Struct([]byte(str), out)
+	err = byte2Struct([]byte(str), out)
 	if err != nil {
 		return err
 	}
@@ -89,7 +89,7 @@ func connectDB(cfg DBConfig, sshConfig *SSHConfig) (db *sql.DB, err error) {
 	return db, err
 }
 
-func Byte2Struct(data []byte, dst any) (err error) {
+func byte2Struct(data []byte, dst any) (err error) {
 	if dst == nil {
 		return
 	}
