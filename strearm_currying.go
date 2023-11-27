@@ -13,7 +13,7 @@ type GetDBI interface {
 
 // MysqlPackHandler 执行sql获取返回
 func MysqlPackHandler(db *sql.DB) (packHandler stream.PackHandler) {
-	packHandler = stream.NewPackHandlerWithSetContext(nil, func(ctx context.Context, input []byte) (out []byte, err error) {
+	packHandler = stream.NewPackHandler(func(ctx context.Context, input []byte) (out []byte, err error) {
 		sql := string(input)
 		data, err := ExecOrQueryContext(ctx, db, sql)
 		if err != nil {
