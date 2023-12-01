@@ -1,4 +1,4 @@
-package sqlstream_test
+package sqlexec_test
 
 import (
 	"context"

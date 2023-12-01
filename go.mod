@@ -1,4 +1,4 @@
-module github.com/suifengpiao14/sqlstream
+module github.com/suifengpiao14/sqlexec
 
 go 1.21.0
 
@@ -12,7 +12,6 @@ require (
 	github.com/stretchr/testify v1.8.4
 	github.com/suifengpiao14/funcs v0.0.17
 	github.com/suifengpiao14/logchan/v2 v2.0.22
-	github.com/suifengpiao14/stream v0.0.20
 	github.com/tidwall/gjson v1.17.0
 	golang.org/x/crypto v0.15.0
 	golang.org/x/sync v0.5.0
@@ -29,7 +28,6 @@ require (
 	github.com/rogpeppe/go-internal v1.11.0 // indirect
 	github.com/tidwall/match v1.1.1 // indirect
 	github.com/tidwall/pretty v1.2.0 // indirect
-	github.com/tidwall/sjson v1.2.5 // indirect
 	golang.org/x/sys v0.14.0 // indirect
 	golang.org/x/text v0.14.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect

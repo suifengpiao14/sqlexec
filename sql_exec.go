@@ -1,4 +1,4 @@
-package sqlstream
+package sqlexec
 
 import (
 	"context"

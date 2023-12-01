@@ -1,30 +1,30 @@
-package sqlstream_test
+package sqlexec_test
 
 import (
 	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/require"
-	"github.com/suifengpiao14/sqlstream"
+	"github.com/suifengpiao14/sqlexec"
 )
 
-func GetExecutorSQL() (executorSql *sqlstream.ExecutorSQL) {
-	dbConfig := sqlstream.DBConfig{
+func GetExecutorSQL() (executorSql *sqlexec.ExecutorSQL) {
+	dbConfig := sqlexec.DBConfig{
 		DSN: `root:1b03f8b486908bbe34ca2f4a4b91bd1c@mysql(127.0.0.1:3306)/curdservice?charset=utf8&timeout=5s&readTimeout=5s&writeTimeout=5s&parseTime=False&loc=Local&multiStatements=true`,
 	}
-	sshConfig := &sqlstream.SSHConfig{
+	sshConfig := &sqlexec.SSHConfig{
 		Address:        "120.24.156.100:2221",
 		User:           "root",
 		PriviteKeyFile: "C:\\Users\\Admin\\.ssh\\id_rsa",
 	}
 
-	executorSql = sqlstream.NewExecutorSQL(dbConfig, sshConfig)
+	executorSql = sqlexec.NewExecutorSQL(dbConfig, sshConfig)
 	return executorSql
 
 }
 
 func TestSshMysql(t *testing.T) {
-	sshConfig := sqlstream.SSHConfig{
+	sshConfig := sqlexec.SSHConfig{
 		Address:  "ip:port",
 		User:     "username",
 		Password: "",
