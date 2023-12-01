@@ -7,6 +7,10 @@ import (
 	"github.com/pkg/errors"
 )
 
+type GetDBI interface {
+	GetDB() *sql.DB
+}
+
 var dbMap sync.Map
 
 func RegisterDB(identity string, db *sql.DB) (err error) {
