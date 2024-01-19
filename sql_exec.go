@@ -14,7 +14,6 @@ import (
 	"github.com/jmoiron/sqlx"
 	"github.com/pkg/errors"
 	"github.com/spf13/cast"
-	"github.com/suifengpiao14/funcs"
 	"github.com/suifengpiao14/logchan/v2"
 	"github.com/tidwall/gjson"
 	"golang.org/x/sync/singleflight"
@@ -122,7 +121,7 @@ func ExecOrQueryContext(ctx context.Context, db *sql.DB, sqls string) (out strin
 		sqlLogInfo.Err = err
 		logchan.SendLogInfo(sqlLogInfo)
 	}()
-	sqls = funcs.StandardizeSpaces(funcs.TrimSpaces(sqls)) // 格式化sql语句
+	//sqls = funcs.StandardizeSpaces(funcs.TrimSpaces(sqls)) // 格式化sql语句 // 语句中间的\n \t 等保持，比如保存http协议，就必须保存\n,如果get请求，只有header，没有body，最后的\r\n 也必须保留，所以注释这个地方
 	stmt, err := sqlparser.Parse(sqls)
 	if err != nil {
 		return "", errors.WithMessage(err, sqls)
