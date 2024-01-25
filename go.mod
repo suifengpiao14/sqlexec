@@ -14,6 +14,7 @@ require (
 	github.com/tidwall/gjson v1.17.0
 	golang.org/x/crypto v0.15.0
 	golang.org/x/sync v0.5.0
+	gorm.io/gorm v1.25.5
 )
 
 require (

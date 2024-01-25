@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"net"
 	"reflect"
+	"strings"
 	"sync"
 	"time"
 
@@ -17,6 +18,7 @@ import (
 	"github.com/suifengpiao14/logchan/v2"
 	"github.com/tidwall/gjson"
 	"golang.org/x/sync/singleflight"
+	gormLogger "gorm.io/gorm/logger"
 )
 
 type DBConfig struct {
@@ -267,4 +269,16 @@ func QueryContext(ctx context.Context, db *sql.DB, sqls string) (out string, err
 	}
 	out = v.(string)
 	return out, nil
+}
+
+// ExplainSQL 将字named sql,数据整合为sql
+func ExplainSQL(namedSql string, namedData map[string]interface{}) (sql string, err error) {
+	namedSql = strings.TrimSpace(namedSql)
+	statment, arguments, err := sqlx.Named(namedSql, namedData)
+	if err != nil {
+		err = errors.WithStack(err)
+		return "", err
+	}
+	sql = gormLogger.ExplainSQL(statment, nil, `'`, arguments...)
+	return sql, nil
 }
