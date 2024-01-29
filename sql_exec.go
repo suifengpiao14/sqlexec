@@ -16,6 +16,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/spf13/cast"
 	"github.com/suifengpiao14/logchan/v2"
+	"github.com/suifengpiao14/sshmysql"
 	"github.com/tidwall/gjson"
 	"golang.org/x/sync/singleflight"
 	gormLogger "gorm.io/gorm/logger"
@@ -32,12 +33,12 @@ type DBConfig struct {
 
 type ExecutorSQL struct {
 	dbConfig  DBConfig
-	sshConfig *SSHConfig
+	sshConfig *sshmysql.SSHConfig
 	_db       *sql.DB
 	once      sync.Once
 }
 
-func NewExecutorSQL(dbConfig DBConfig, sshConfig *SSHConfig) (e *ExecutorSQL) {
+func NewExecutorSQL(dbConfig DBConfig, sshConfig *sshmysql.SSHConfig) (e *ExecutorSQL) {
 	return &ExecutorSQL{
 		dbConfig:  dbConfig,
 		sshConfig: sshConfig,
@@ -81,7 +82,7 @@ func (e *ExecutorSQL) ExecOrQueryContext(ctx context.Context, sqls string, out i
 
 var DriverName = "mysql"
 
-func connectDB(cfg DBConfig, sshConfig *SSHConfig) (db *sql.DB, err error) {
+func connectDB(cfg DBConfig, sshConfig *sshmysql.SSHConfig) (db *sql.DB, err error) {
 	if sshConfig != nil {
 		db, err = sshConfig.Tunnel(cfg.DSN)
 	} else {
