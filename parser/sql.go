@@ -150,10 +150,16 @@ func extractComments(sql string) []string {
 	// (--[^\n\r]*) 双减号注释
 	// (#.*) 井号注释
 	// (/\*([^*]|[\r\n]|(\*+([^*/]|[\r\n])))*\*+/) 多行注释
-	commentRegex := regexp.MustCompile(`(--[^\n\r]*)|(#.*)|(/\*([^*]|[\r\n]|(\*+([^*/]|[\r\n])))*\*+/)`)
+	commentRegex := regexp.MustCompile(`("(""|[^"]|(\"))*")|('(''|[^']|(\'))*')|(--[^\n\r]*)|(#.*)|(/\*([^*]|[\r\n]|(\*+([^*/]|[\r\n])))*\*+/)`)
 	comments := make([]string, 0)
 	res := commentRegex.FindAllString(sql, -1)
 	for _, comment := range res {
+		if (comment[0] == '"' && comment[len(comment)-1] == '"') ||
+			(comment[0] == '\'' && comment[len(comment)-1] == '\'') ||
+			(string(comment[:3]) == "/*!") {
+			continue
+		}
+
 		comment = strings.TrimSpace(strings.TrimSuffix(strings.TrimPrefix(comment, "/*"), "*/"))
 		arr := strings.Split(comment, "\n")
 		for _, line := range arr {
