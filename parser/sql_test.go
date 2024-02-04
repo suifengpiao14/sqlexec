@@ -22,7 +22,11 @@ func TestParseSQL(t *testing.T) {
 		fmt.Println(sqlTpl.String())
 	})
 	t.Run("select", func(t *testing.T) {
+		//todo 注释解析
 		sql := `
+		/**
+		id required
+		**/
 		-- id required
 		select id,name,nickname from  user where id>1 and name like '%三';`
 		sqlTpl, err := parser.ParseSQL(sql)

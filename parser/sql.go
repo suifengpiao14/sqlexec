@@ -2,6 +2,8 @@ package parser
 
 import (
 	"encoding/json"
+	"regexp"
+	"strings"
 
 	"github.com/blastrain/vitess-sqlparser/sqlparser"
 )
@@ -84,7 +86,7 @@ func ParseSQL(sqlStr string) (sqlTpl *SQLTpl, err error) {
 		return nil, err
 	}
 	sqlTpl = &SQLTpl{
-		Comments: make([]string, 0),
+		Comments: extractComments(sqlStr),
 		Update:   make(ColumnValues, 0),
 		Where:    make(ColumnValues, 0),
 		Insert:   make(ColumnValues, 0),
@@ -118,9 +120,6 @@ func ParseSQL(sqlStr string) (sqlTpl *SQLTpl, err error) {
 	case *sqlparser.Select:
 		whereColumnValues := ParseWhere(stmt.Where)
 		sqlTpl.Where.AddIgnore(whereColumnValues...)
-		for _, comment := range stmt.Comments {
-			sqlTpl.Comments = append(sqlTpl.Comments, string(comment))
-		}
 	}
 	sqlTpl.Example = sqlparser.String(stmt)
 	return sqlTpl, nil
@@ -142,4 +141,28 @@ func ParseWhere(whereExpr *sqlparser.Where) (columnValues ColumnValues) {
 		return true, nil
 	})
 	return columnValues
+}
+
+// extractComments 去除SQL中的注释
+func extractComments(sql string) []string {
+	// ("(""|[^"]|(\"))*") 双引号中的内容, "", "\""
+	// ('(''|[^']|(\'))*') 单引号中的内容, '', '\''
+	// (--[^\n\r]*) 双减号注释
+	// (#.*) 井号注释
+	// (/\*([^*]|[\r\n]|(\*+([^*/]|[\r\n])))*\*+/) 多行注释
+	commentRegex := regexp.MustCompile(`(--[^\n\r]*)|(#.*)|(/\*([^*]|[\r\n]|(\*+([^*/]|[\r\n])))*\*+/)`)
+	comments := make([]string, 0)
+	res := commentRegex.FindAllString(sql, -1)
+	for _, comment := range res {
+		comment = strings.TrimSpace(strings.TrimSuffix(strings.TrimPrefix(comment, "/*"), "*/"))
+		arr := strings.Split(comment, "\n")
+		for _, line := range arr {
+			line = strings.TrimSpace(strings.Trim(line, "*- "))
+			if line == "" {
+				continue
+			}
+			comments = append(comments, line)
+		}
+	}
+	return comments
 }
