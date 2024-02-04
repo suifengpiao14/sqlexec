@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"fmt"
 	"net"
 	"reflect"
 	"strings"
@@ -273,7 +274,7 @@ func QueryContext(ctx context.Context, db *sql.DB, sqls string) (out string, err
 }
 
 // ExplainSQL 将字named sql,数据整合为sql
-func ExplainSQL(namedSql string, namedData map[string]interface{}) (sql string, err error) {
+func ExplainSQL(namedSql string, namedData map[string]any) (sql string, err error) {
 	namedSql = strings.TrimSpace(namedSql)
 	statment, arguments, err := sqlx.Named(namedSql, namedData)
 	if err != nil {
@@ -282,4 +283,85 @@ func ExplainSQL(namedSql string, namedData map[string]interface{}) (sql string, 
 	}
 	sql = gormLogger.ExplainSQL(statment, nil, `'`, arguments...)
 	return sql, nil
+}
+
+//ExplainNamedSQL 带占位符的sql模板绑定数据后转换为常规sql(可以替换ExplainSQL,相比ExplainSQL 能更好的支持in 条件查询)
+func ExplainNamedSQL(namedSQL string, namedData map[string]any) (string, error) {
+	stmt, err := sqlparser.Parse(namedSQL)
+	if err != nil {
+		return "", err
+	}
+	bindVars := make(map[string]any)
+	for key, val := range namedData {
+		key = fmt.Sprintf(":%s", key)
+		bindVars[key] = val
+	}
+	err = replacePlaceholdersRecursive(stmt, bindVars)
+	if err != nil {
+		return "", err
+	}
+
+	return sqlparser.String(stmt), nil
+}
+
+func replacePlaceholdersRecursive(node sqlparser.SQLNode, bindVars map[string]any) error {
+	return sqlparser.Walk(func(node sqlparser.SQLNode) (kontinue bool, err error) {
+		switch node := node.(type) {
+		case *sqlparser.SQLVal:
+			// Replace placeholders with bind variables
+			if node.Type == sqlparser.ValArg {
+				name := string(node.Val)
+				val, ok := bindVars[name]
+				if !ok {
+					err = errors.Errorf("bind variable not found: %s", name)
+					return false, err
+				}
+				node.Val, err = convertValue(val) // 放到这个地方转换，主要是只转换关心的数据，其它数据容许错误，提高容错能力
+				if err != nil {
+					return false, err
+				}
+			}
+		}
+		return true, nil
+	}, node)
+}
+
+func convertValue(value any) ([]byte, error) {
+	switch v := reflect.Indirect(reflect.ValueOf(value)); v.Kind() {
+	case reflect.Int, reflect.Int64, reflect.Float64:
+		return []byte(fmt.Sprintf("%v", value)), nil
+	case reflect.String:
+		return []byte(fmt.Sprintf("'%v'", v)), nil
+	case reflect.Slice:
+		// Handle []string and []int
+		if v.Len() == 0 {
+			err := errors.Errorf("empty slice")
+			return nil, err
+		}
+		switch v.Index(0).Kind() {
+		case reflect.String:
+			strValues := make([]string, v.Len())
+			for i := 0; i < v.Len(); i++ {
+				strValues[i] = v.Index(i).String()
+			}
+			return []byte(fmt.Sprintf("'%s'", strings.Join(strValues, "','"))), nil
+		case reflect.Int, reflect.Int64:
+			intValues := make([]string, v.Len())
+			for i := 0; i < v.Len(); i++ {
+				intValues[i] = fmt.Sprintf("%d", v.Index(i).Int())
+			}
+			return []byte(strings.Join(intValues, ",")), nil
+		case reflect.Float32, reflect.Float64:
+			floatValues := make([]string, v.Len())
+			for i := 0; i < v.Len(); i++ {
+				floatValues[i] = fmt.Sprintf("%f", v.Index(i).Float())
+			}
+			return []byte(strings.Join(floatValues, ",")), nil
+		default:
+			return nil, fmt.Errorf("unsupported slice type: %s", v.Type())
+		}
+
+	default:
+		return nil, fmt.Errorf("unsupported type: %s", v.Type())
+	}
 }

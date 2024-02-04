@@ -60,3 +60,15 @@ func TestSelect(t *testing.T) {
 		fmt.Println(out)
 	})
 }
+
+func TestExplainNamedSQL(t *testing.T) {
+	namedSQL := "select * from service where 1=1 and id=:id and name=:name and `key` in (:keys);"
+	bindVars := map[string]any{
+		"id":   1,
+		"name": "%张三",
+		"keys": []string{"a", "b"},
+	}
+	sql, err := sqlexec.ExplainNamedSQL(namedSQL, bindVars)
+	require.NoError(t, err)
+	fmt.Println(sql)
+}
