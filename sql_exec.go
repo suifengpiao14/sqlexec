@@ -285,7 +285,7 @@ func ExplainSQL(namedSql string, namedData map[string]any) (sql string, err erro
 	return sql, nil
 }
 
-//ExplainNamedSQL 带占位符的sql模板绑定数据后转换为常规sql(可以替换ExplainSQL,相比ExplainSQL 能更好的支持in 条件查询)
+//ExplainNamedSQL 带占位符的sql模板绑定数据后转换为常规sql(可以替换ExplainSQL,相比ExplainSQL 能更好的支持in 条件查询) 调用前可以先使用MysqlRealEscapeString 转义字符
 func ExplainNamedSQL(namedSQL string, namedData map[string]any) (string, error) {
 	stmt, err := sqlparser.Parse(namedSQL)
 	if err != nil {
@@ -364,4 +364,23 @@ func convertValue(value any) ([]byte, error) {
 	default:
 		return nil, fmt.Errorf("unsupported type: %s", v.Type())
 	}
+}
+
+// MysqlRealEscapeString 初步的防sql注入
+func MysqlRealEscapeString(value string) string {
+	var sb strings.Builder
+	for i := 0; i < len(value); i++ {
+		c := value[i]
+		switch c {
+		case '\\', 0, '\n', '\r', '\'', '"':
+			sb.WriteByte('\\')
+			sb.WriteByte(c)
+		case '\032':
+			sb.WriteByte('\\')
+			sb.WriteByte('Z')
+		default:
+			sb.WriteByte(c)
+		}
+	}
+	return sb.String()
 }

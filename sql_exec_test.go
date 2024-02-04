@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/blastrain/vitess-sqlparser/sqlparser"
 	"github.com/stretchr/testify/require"
 	"github.com/suifengpiao14/sqlexec"
 	"github.com/suifengpiao14/sshmysql"
@@ -65,10 +66,33 @@ func TestExplainNamedSQL(t *testing.T) {
 	namedSQL := "select * from service where 1=1 and id=:id and name=:name and `key` in (:keys);"
 	bindVars := map[string]any{
 		"id":   1,
-		"name": "%张三",
+		"name": "%张三\n李四",
 		"keys": []string{"a", "b"},
 	}
 	sql, err := sqlexec.ExplainNamedSQL(namedSQL, bindVars)
 	require.NoError(t, err)
 	fmt.Println(sql)
+}
+func TestSegemt(t *testing.T) {
+
+	t.Run("update", func(t *testing.T) {
+		namedSQL := "set id=1"
+		stmt, err := sqlparser.Parse(namedSQL)
+		require.NoError(t, err)
+		fmt.Println(stmt)
+	})
+	t.Run("select ", func(t *testing.T) {
+		namedSQL := "select  id "
+		stmt, err := sqlparser.Parse(namedSQL)
+		require.NoError(t, err)
+		fmt.Println(stmt)
+	})
+
+	t.Run("where ", func(t *testing.T) {
+		namedSQL := "select * from test where id=1 " // where 标记不行 where id=1 会报错
+		stmt, err := sqlparser.Parse(namedSQL)
+		require.NoError(t, err)
+		fmt.Println(stmt)
+	})
+
 }
