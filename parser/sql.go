@@ -86,7 +86,45 @@ type SQLTpl struct {
 	Where       ColumnValues  `json:"where"`
 	Insert      ColumnValues  `json:"insert"`
 	PlaceHodler []PlaceHodler `json:"placeHodler"`
+	Metas       []Meta        `json:"metas"`
 }
+
+// Meta 记录列的属性,解析注释产生
+type Meta struct {
+	Column     string   `json:"column"`
+	Attributes []string `json:"attributes"` // 记录列属性,比如必填存在 required
+}
+
+func (m *Meta) AddAttribute(attribute string) {
+	if m.Attributes == nil {
+		m.Attributes = make([]string, 0)
+	}
+	// 排重
+	for _, attr := range m.Attributes {
+		if strings.EqualFold(attr, attribute) {
+			return
+		}
+	}
+	m.Attributes = append(m.Attributes, attribute)
+}
+
+type Metas []Meta
+
+func (ms *Metas) AddIgnore(metas ...Meta) {
+	for _, m := range metas {
+		exists := false
+		for _, em := range *ms {
+			if strings.EqualFold(em.Column, m.Column) {
+				exists = true
+			}
+		}
+		if exists {
+			continue
+		}
+		*ms = append(*ms, m)
+	}
+}
+
 type PlaceHodler struct {
 	Type string `json:"type"`
 	Text string `json:"text"`
@@ -151,13 +189,17 @@ func ParseSQL(sqlStr string) (sqlTpl *SQLTpl, err error) {
 	if err != nil {
 		return nil, err
 	}
+	comments := extractComments(sqlStr)
+	metas := parseComments(comments...)
+
 	sqlTpl = &SQLTpl{
-		Comments:    extractComments(sqlStr),
+		Comments:    comments,
 		Update:      make(ColumnValues, 0),
 		Where:       make(ColumnValues, 0),
 		Insert:      make(ColumnValues, 0),
 		Example:     sqlparser.String(stmt),
 		PlaceHodler: DefaultPlaceHodler,
+		Metas:       metas,
 	}
 	switch stmt := stmt.(type) {
 	case *sqlparser.Update:
@@ -277,4 +319,29 @@ func extractComments(sql string) []string {
 		}
 	}
 	return comments
+}
+
+const (
+	Meta_Attribute_Required = "required"
+)
+
+func parseComments(comments ...string) (metas Metas) {
+	metas = make(Metas, 0)
+	for _, comment := range comments {
+		meta := Meta{}
+		comment = strings.TrimSpace(comment)
+		meta.Column = comment
+		spaceIndex := strings.Index(comment, " ")
+		if spaceIndex > -1 {
+			meta.Column = comment[:spaceIndex]
+		}
+		//解析必填字断
+		if strings.Contains(comment, Meta_Attribute_Required) {
+			meta.AddAttribute(Meta_Attribute_Required)
+		}
+		if len(meta.Attributes) > 0 { //存在属性则收集
+			metas.AddIgnore(meta)
+		}
+	}
+	return metas
 }

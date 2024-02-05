@@ -11,7 +11,9 @@ import (
 
 func TestParseSQL(t *testing.T) {
 	t.Run("update", func(t *testing.T) {
-		sql := "update user set name='張三' where id=1;"
+		sql := `
+		-- id required
+		update user set name='張三' where id=1;`
 		sqlTpl, err := parser.ParseSQL(sql)
 		require.NoError(t, err)
 		setPlaceHodler, _ := parser.DefaultPlaceHodler.GetByType(parser.PlaceHolder_Type_Set)
