@@ -1,7 +1,9 @@
 package parser
 
 import (
+	"bytes"
 	"encoding/json"
+	"fmt"
 	"regexp"
 	"strings"
 
@@ -28,10 +30,23 @@ type Comment struct {
 }
 
 type ColumnValue struct {
-	Column   string //列
-	Value    string //值
-	Operator string // 操作
+	Column   string `json:"column"`   //列
+	Value    string `json:"value"`    //值
+	Operator string `json:"operator"` // 操作
 }
+
+/*
+func (c ColumnValue) MarshalJSON() ([]byte, error) {
+	var w bytes.Buffer
+	w.WriteByte('{')
+	w.WriteString(fmt.Sprintf(`"column":"%s",`, c.Column))
+	w.WriteString(fmt.Sprintf(`"value":"%s",`, c.Value))
+	w.WriteString(fmt.Sprintf(`"operator":"%s"`, c.Operator))
+	w.WriteByte('}')
+	s := w.String()
+	return []byte(s), nil
+}
+*/
 
 type ColumnValues []ColumnValue
 
@@ -56,7 +71,7 @@ func (cvs *ColumnValues) AddIgnore(columnValues ...ColumnValue) {
 
 func (c ColumnValues) GetByColumn(column string, operator string) (col *ColumnValue, ok bool) {
 	for _, columnValue := range c {
-		if columnValue.Column == column && columnValue.Operator == operator {
+		if columnValue.Column == column && strings.EqualFold(columnValue.Operator, operator) {
 			return &columnValue, true
 		}
 	}
@@ -64,21 +79,72 @@ func (c ColumnValues) GetByColumn(column string, operator string) (col *ColumnVa
 }
 
 type SQLTpl struct {
-	Comments []string     `json:"comments"`
-	Example  string       `json:"example"`
-	Update   ColumnValues `json:"update"`
-	Where    ColumnValues `json:"where"`
-	Insert   ColumnValues `json:"insert"`
+	Comments    []string      `json:"comments"`
+	Tpl         string        `json:"tpl"`
+	Example     string        `json:"example"`
+	Update      ColumnValues  `json:"update"`
+	Where       ColumnValues  `json:"where"`
+	Insert      ColumnValues  `json:"insert"`
+	PlaceHodler []PlaceHodler `json:"placeHodler"`
+}
+type PlaceHodler struct {
+	Type string `json:"type"`
+	Text string `json:"text"`
+}
+type PlaceHodlers []PlaceHodler
+
+func (ps PlaceHodlers) GetByType(typ string) (placeHodler *PlaceHodler, ok bool) {
+	for _, p := range ps {
+		if strings.EqualFold(p.Type, typ) {
+			return &p, true
+		}
+	}
+	return nil, true
+}
+
+const (
+	PlaceHolder_Type_Where = "wehre"
+	PlaceHolder_Type_Set   = "set"
+	PlaceHolder_Type_Value = "value"
+)
+
+var DefaultPlaceHodler = PlaceHodlers{
+	{
+		Type: PlaceHolder_Type_Where,
+		Text: fmt.Sprintf(`%s = '%s'`, PlaceHolder_Where_Column, PlaceHolder_Where_Value), //whereColumn = 'whereValue'
+	},
+	{
+		Type: PlaceHolder_Type_Set,
+		Text: fmt.Sprintf(`%s = '%s'`, PlaceHolder_Set_Column, PlaceHolder_Set_Value), //setColumn = 'setValue'
+	},
+	{
+		Type: PlaceHolder_Type_Value,
+		Text: fmt.Sprintf(`(%s) values ('%s')`, PlaceHolder_Values_Column, PlaceHolder_Values_Value), //(valueColumn) values ('valueValue')
+	},
 }
 
 func (sqlTpl SQLTpl) String() string {
-	b, err := json.Marshal(sqlTpl)
+	sqlTpl.PlaceHodler = DefaultPlaceHodler // 携带占位符数据,方便调用方替换
+	var w bytes.Buffer
+	encoder := json.NewEncoder(&w)
+	encoder.SetEscapeHTML(false)
+	err := encoder.Encode(sqlTpl)
 	if err != nil {
 		panic(err)
 	}
-	s := string(b)
+	s := w.String()
 	return s
 }
+
+const (
+	PlaceHolder_Set_Column   = "setColumn"
+	PlaceHolder_Set_Value    = "setValue"
+	PlaceHolder_Where_Column = "whereColumn"
+	PlaceHolder_Where_Value  = "whereValue"
+
+	PlaceHolder_Values_Column = "valueColumn"
+	PlaceHolder_Values_Value  = "valueValue"
+)
 
 func ParseSQL(sqlStr string) (sqlTpl *SQLTpl, err error) {
 	stmt, err := sqlparser.Parse(sqlStr)
@@ -86,10 +152,12 @@ func ParseSQL(sqlStr string) (sqlTpl *SQLTpl, err error) {
 		return nil, err
 	}
 	sqlTpl = &SQLTpl{
-		Comments: extractComments(sqlStr),
-		Update:   make(ColumnValues, 0),
-		Where:    make(ColumnValues, 0),
-		Insert:   make(ColumnValues, 0),
+		Comments:    extractComments(sqlStr),
+		Update:      make(ColumnValues, 0),
+		Where:       make(ColumnValues, 0),
+		Insert:      make(ColumnValues, 0),
+		Example:     sqlparser.String(stmt),
+		PlaceHodler: DefaultPlaceHodler,
 	}
 	switch stmt := stmt.(type) {
 	case *sqlparser.Update:
@@ -106,8 +174,27 @@ func ParseSQL(sqlStr string) (sqlTpl *SQLTpl, err error) {
 		if stmt.Where != nil {
 			whereColumnValues := ParseWhere(stmt.Where)
 			sqlTpl.Where.AddIgnore(whereColumnValues...)
+			// 构建where占位符
+			valExpr := &sqlparser.SQLVal{Type: sqlparser.StrVal, Val: []byte(PlaceHolder_Where_Value)}
+			colIdent := sqlparser.NewColIdent(PlaceHolder_Where_Column)
+			colName := &sqlparser.ColName{Name: colIdent}
+			whereExpr := &sqlparser.ComparisonExpr{
+				Operator: sqlparser.EqualStr,
+				Left:     colName,
+				Right:    valExpr,
+			}
+			stmt.Where = sqlparser.NewWhere(sqlparser.WhereStr, whereExpr)
 		}
-		sqlTpl.Example = sqlparser.String(stmt)
+		// 构建set占位符
+		colIdent := sqlparser.NewColIdent(PlaceHolder_Set_Column)
+		column := &sqlparser.ColName{Name: colIdent}
+		updateExpr := &sqlparser.SQLVal{Type: sqlparser.StrVal, Val: []byte(PlaceHolder_Set_Value)}
+		assignment := &sqlparser.UpdateExpr{Name: column, Expr: updateExpr}
+		stmt.Exprs = sqlparser.UpdateExprs{
+			assignment,
+		}
+
+		sqlTpl.Tpl = sqlparser.String(stmt)
 
 	case *sqlparser.Insert:
 		for _, column := range stmt.Columns {
@@ -115,13 +202,32 @@ func ParseSQL(sqlStr string) (sqlTpl *SQLTpl, err error) {
 				Column: column.String(),
 			})
 		}
-		sqlTpl.Example = sqlparser.String(stmt)
+
+		colIdent := sqlparser.NewColIdent(PlaceHolder_Values_Column)
+		stmt.Columns = sqlparser.Columns{
+			colIdent,
+		}
+		valExpr := &sqlparser.SQLVal{Type: sqlparser.StrVal, Val: []byte(PlaceHolder_Values_Value)}
+		stmt.Rows = sqlparser.Values{
+			{valExpr},
+		}
+		sqlTpl.Tpl = sqlparser.String(stmt)
 
 	case *sqlparser.Select:
 		whereColumnValues := ParseWhere(stmt.Where)
 		sqlTpl.Where.AddIgnore(whereColumnValues...)
+		// 构建where占位符
+		valExpr := &sqlparser.SQLVal{Type: sqlparser.StrVal, Val: []byte(PlaceHolder_Where_Value)}
+		colIdent := sqlparser.NewColIdent(PlaceHolder_Where_Column)
+		colName := &sqlparser.ColName{Name: colIdent}
+		whereExpr := &sqlparser.ComparisonExpr{
+			Operator: sqlparser.EqualStr,
+			Left:     colName,
+			Right:    valExpr,
+		}
+		stmt.Where = sqlparser.NewWhere(sqlparser.WhereStr, whereExpr)
+		sqlTpl.Tpl = sqlparser.String(stmt)
 	}
-	sqlTpl.Example = sqlparser.String(stmt)
 	return sqlTpl, nil
 }
 
