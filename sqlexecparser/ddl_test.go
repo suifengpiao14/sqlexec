@@ -1,11 +1,11 @@
-package parser_test
+package sqlexecparser_test
 
 import (
 	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/require"
-	"github.com/suifengpiao14/sqlexec/parser"
+	"github.com/suifengpiao14/sqlexec/sqlexecparser"
 )
 
 var createDDLStr = `CREATE TABLE ad.plan (
@@ -53,7 +53,7 @@ var createDDLStr = `CREATE TABLE ad.plan (
 `
 
 func TestParseCreateDDL(t *testing.T) {
-	table, err := parser.ParseCreateDDL(createDDLStr)
+	table, err := sqlexecparser.ParseCreateDDL(createDDLStr)
 	require.NoError(t, err)
 	fmt.Println(table.String())
 }

@@ -1,4 +1,4 @@
-package parser
+package sqlexecparser
 
 import (
 	"encoding/json"
@@ -13,9 +13,9 @@ import (
 /***********************************************************************/
 
 type Table struct {
-	TableName string    `json:"tableName"`
-	Columns   []*Column `json:"columns"`
-	Comment   string    `json:"comment"`
+	TableName string  `json:"tableName"`
+	Columns   Columns `json:"columns"`
+	Comment   string  `json:"comment"`
 }
 
 type Tables []Table
@@ -42,6 +42,25 @@ type Column struct {
 	OnUpdate      bool     `json:"onUpdate,string"`
 }
 
+type Columns []Column
+
+func (cs Columns) GetPrimary() (primaries Columns) {
+	primaries = make(Columns, 0)
+	for _, c := range cs {
+		if c.PrimaryKey {
+			primaries = append(primaries, c)
+		}
+	}
+	return primaries
+}
+
+func (cs Columns) GetFirst() (first *Column, ok bool) {
+	if len(cs) == 0 {
+		return nil, false
+	}
+	return &cs[0], true
+}
+
 func (t Table) String() string {
 	b, err := json.Marshal(t)
 	if err != nil {
@@ -61,7 +80,7 @@ func (c *Column) IsDefaultValueCurrentTimestamp() bool {
 	return strings.Contains(strings.ToLower(c.DefaultValue), DEFAULT_VALUE_CURRENT_TIMESTAMP) // 测试发现有 current_timestamp() 情况
 }
 
-//ParseCreateDDL 解析建表ddl
+// ParseCreateDDL 解析建表ddl
 func ParseCreateDDL(ddlStatements string) (tables Tables, err error) {
 	arr := strings.Split(ddlStatements, ";")
 	tables = make(Tables, 0)
@@ -80,7 +99,7 @@ func ParseCreateDDL(ddlStatements string) (tables Tables, err error) {
 	return tables, nil
 }
 
-//ParseOneCreateDDL 解析单个表
+// ParseOneCreateDDL 解析单个表
 func ParseOneCreateDDL(ddlStatement string) (table *Table, err error) {
 	stmt, err := sqlparser.Parse(ddlStatement)
 	if err != nil {
@@ -95,7 +114,7 @@ func ParseOneCreateDDL(ddlStatement string) (table *Table, err error) {
 	}
 	table = &Table{
 		TableName: createTableStmt.NewName.Name.String(),
-		Columns:   make([]*Column, 0),
+		Columns:   make(Columns, 0),
 	}
 	for _, option := range createTableStmt.Options {
 		if option.Type == sqlparser.TableOptionComment {
@@ -104,7 +123,7 @@ func ParseOneCreateDDL(ddlStatement string) (table *Table, err error) {
 	}
 
 	for _, column := range createTableStmt.Columns {
-		col := &Column{
+		col := Column{
 			ColumnName: column.Name,
 			Type:       column.Type,
 			Enums:      make([]string, 0), // 确保json化后为[],而不是null
