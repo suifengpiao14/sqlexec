@@ -13,9 +13,103 @@ import (
 /***********************************************************************/
 
 type Table struct {
-	TableName string  `json:"tableName"`
-	Columns   Columns `json:"columns"`
-	Comment   string  `json:"comment"`
+	TableName   string      `json:"tableName"`
+	Columns     Columns     `json:"columns"`
+	Comment     string      `json:"comment"`
+	Constraints Constraints `json:"constraints"`
+}
+
+type Constraints []Constraint
+
+type Constraint struct {
+	Type        string   `json:"type"`
+	ColumnNames []string `json:"columnNames"`
+}
+
+const (
+	Constraint_Type_Primary  = "primary"
+	Constraint_Type_Uniqueue = "uniqueue"
+)
+
+func (c *Constraint) AddColumnName(columnNames ...string) {
+	if c.ColumnNames == nil {
+		c.ColumnNames = make([]string, 0)
+	}
+	for _, columnName := range columnNames {
+		exists := false
+		for _, cName := range c.ColumnNames {
+			if strings.EqualFold(cName, columnName) {
+				exists = true
+				break
+			}
+		}
+		if exists {
+			continue
+		}
+		c.ColumnNames = append(c.ColumnNames, columnName)
+	}
+
+}
+
+func (c Constraint) Equal(typ string, columnNames ...string) (yes bool) {
+	if !strings.EqualFold(c.Type, typ) {
+		return false
+	}
+	if len(columnNames) != len(c.ColumnNames) {
+		return false
+	}
+	for _, name := range columnNames {
+		exists := false
+		for _, en := range c.ColumnNames {
+			if strings.EqualFold(en, name) {
+				exists = true
+				break
+			}
+		}
+		if !exists {
+			return false
+		}
+	}
+	return true
+}
+
+func (cs *Constraints) Add(typ string, columnNames ...string) {
+	constraint := Constraint{
+		Type: typ,
+	}
+	i := 0
+	for i = 0; i < len(*cs); i++ {
+		c := (*cs)[i]
+		if strings.EqualFold(c.Type, typ) {
+			constraint = c
+			break
+		}
+	}
+	constraint.AddColumnName(columnNames...)
+	if i < len(*cs) {
+		(*cs)[i] = constraint
+		return
+	}
+	*cs = append(*cs, constraint)
+
+}
+
+func (cs Constraints) IsPrimaryKey(columnNames ...string) (yes bool) {
+	primaryConstraint, ok := cs.GetByType(Constraint_Type_Primary)
+	if !ok {
+		return false
+	}
+	yes = primaryConstraint.Equal(Constraint_Type_Primary, columnNames...)
+	return yes
+}
+
+func (cs Constraints) GetByType(typ string) (c *Constraint, ok bool) {
+	for _, c := range cs {
+		if strings.EqualFold(c.Type, typ) {
+			return &c, true
+		}
+	}
+	return nil, false
 }
 
 type Tables []Table
@@ -30,7 +124,6 @@ func (tbs Tables) String() string {
 }
 
 type Column struct {
-	PrimaryKey    bool     `json:"primaryKey,string"`
 	ColumnName    string   `json:"columnName"`
 	Type          string   `json:"type"`
 	Comment       string   `json:"comment"`
@@ -44,21 +137,19 @@ type Column struct {
 
 type Columns []Column
 
-func (cs Columns) GetPrimary() (primaries Columns) {
-	primaries = make(Columns, 0)
-	for _, c := range cs {
-		if c.PrimaryKey {
-			primaries = append(primaries, c)
-		}
-	}
-	return primaries
-}
-
 func (cs Columns) GetFirst() (first *Column, ok bool) {
 	if len(cs) == 0 {
 		return nil, false
 	}
 	return &cs[0], true
+}
+func (cs Columns) GetByName(name string) (column *Column, ok bool) {
+	for _, c := range cs {
+		if strings.EqualFold(name, c.ColumnName) {
+			return &c, true
+		}
+	}
+	return nil, false
 }
 
 func (t Table) String() string {
@@ -113,8 +204,9 @@ func ParseOneCreateDDL(ddlStatement string) (table *Table, err error) {
 		return nil, err
 	}
 	table = &Table{
-		TableName: createTableStmt.NewName.Name.String(),
-		Columns:   make(Columns, 0),
+		TableName:   createTableStmt.NewName.Name.String(),
+		Columns:     make(Columns, 0),
+		Constraints: make(Constraints, 0),
 	}
 	for _, option := range createTableStmt.Options {
 		if option.Type == sqlparser.TableOptionComment {
@@ -133,7 +225,7 @@ func ParseOneCreateDDL(ddlStatement string) (table *Table, err error) {
 		for _, option := range column.Options {
 			switch option.Type {
 			case sqlparser.ColumnOptionPrimaryKey:
-				col.PrimaryKey = cast.ToBool(option.Value)
+				table.Constraints.Add(Constraint_Type_Primary, col.ColumnName)
 			case sqlparser.ColumnOptionComment:
 				col.Comment = strings.Trim(option.Value, `"'`)
 			case sqlparser.ColumnOptionNotNull:
@@ -148,6 +240,26 @@ func ParseOneCreateDDL(ddlStatement string) (table *Table, err error) {
 				col.OnUpdate = cast.ToBool(option.Value)
 			}
 
+		}
+
+		for _, constraint := range createTableStmt.Constraints {
+			switch constraint.Type {
+			case sqlparser.ConstraintPrimaryKey:
+				for _, key := range constraint.Keys {
+					table.Constraints.Add(Constraint_Type_Primary, key.String())
+				}
+			case sqlparser.ConstraintKey:
+			case sqlparser.ConstraintIndex:
+			case sqlparser.ConstraintUniq:
+				for _, key := range constraint.Keys {
+					table.Constraints.Add(Constraint_Type_Uniqueue, key.String())
+				}
+			case sqlparser.ConstraintUniqKey:
+			case sqlparser.ConstraintUniqIndex:
+			case sqlparser.ConstraintForeignKey:
+			case sqlparser.ConstraintFulltext:
+
+			}
 		}
 	}
 
