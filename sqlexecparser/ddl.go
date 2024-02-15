@@ -221,7 +221,7 @@ func ParseOneCreateDDL(ddlStatement string) (table *Table, err error) {
 			Enums:      make([]string, 0), // 确保json化后为[],而不是null
 		}
 		col.Enums = append(col.Enums, column.Elems...)
-		table.Columns = append(table.Columns, col)
+
 		for _, option := range column.Options {
 			switch option.Type {
 			case sqlparser.ColumnOptionPrimaryKey:
@@ -239,8 +239,8 @@ func ParseOneCreateDDL(ddlStatement string) (table *Table, err error) {
 			case sqlparser.ColumnOptionOnUpdate:
 				col.OnUpdate = cast.ToBool(option.Value)
 			}
-
 		}
+		table.Columns = append(table.Columns, col)
 
 		for _, constraint := range createTableStmt.Constraints {
 			switch constraint.Type {
