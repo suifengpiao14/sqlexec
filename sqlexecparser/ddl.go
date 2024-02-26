@@ -19,6 +19,38 @@ type Table struct {
 	Constraints Constraints `json:"constraints"`
 }
 
+var (
+	ERROR_NOT_FOUND_PRIMARY_KEY = errors.New("not found primary key")
+	ERROR_NOT_FOUND_COLUMN      = errors.New("not found column")
+)
+
+func (t Table) GetPrimaryKey() (columns Columns, err error) {
+	c, ok := t.Constraints.GetByType(Constraint_Type_Primary)
+	if !ok {
+		err = errors.WithMessagef(ERROR_NOT_FOUND_PRIMARY_KEY, "table:%s", t.TableName)
+		return nil, err
+
+	}
+	columns, err = t.Columns.GetByNames(c.ColumnNames...)
+	if err != nil {
+		return nil, err
+	}
+	return columns, nil
+}
+
+func (t Table) GetUniqKey() (columns Columns, err error) {
+	c, ok := t.Constraints.GetByType(Constraint_Type_Uniqueue)
+	if !ok {
+		return nil, nil
+
+	}
+	columns, err = t.Columns.GetByNames(c.ColumnNames...)
+	if err != nil {
+		return nil, err
+	}
+	return columns, nil
+}
+
 type Constraints []Constraint
 
 type Constraint struct {
@@ -150,6 +182,21 @@ func (cs Columns) GetByName(name string) (column *Column, ok bool) {
 		}
 	}
 	return nil, false
+}
+
+func (cs Columns) GetByNames(names ...string) (columns Columns, err error) {
+	columns = make(Columns, 0)
+	for _, name := range names {
+		col, ok := cs.GetByName(name)
+		if !ok {
+			err = errors.WithMessagef(ERROR_NOT_FOUND_PRIMARY_KEY, "column:%s", col.ColumnName)
+			return nil, err
+		}
+		if ok {
+			columns = append(columns, *col)
+		}
+	}
+	return columns, nil
 }
 
 func (t Table) String() string {
