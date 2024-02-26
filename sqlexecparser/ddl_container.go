@@ -2,6 +2,7 @@ package sqlexecparser
 
 import (
 	"fmt"
+	"regexp"
 	"sync"
 
 	"github.com/pkg/errors"
@@ -46,4 +47,17 @@ func RegisterTableByDDL(database string, ddlStatements string) (err error) {
 		RegisterTable(database, table)
 	}
 	return nil
+}
+
+//GetDBNameFromDSN 从DB 的dsn中获取数据库名称
+func GetDBNameFromDSN(dsn string) (string, error) {
+	// 使用正则表达式提取数据库名称
+	re := regexp.MustCompile(`\/([^\/\?]+)`)
+	matches := re.FindStringSubmatch(dsn)
+
+	if len(matches) < 2 {
+		return "", fmt.Errorf("unable to extract database name from DSN")
+	}
+
+	return matches[1], nil
 }
