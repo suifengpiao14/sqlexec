@@ -1,14 +1,17 @@
-package sqlexecparser_test
+package sqlexec_test
 
 import (
 	"fmt"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/suifengpiao14/sqlexec"
 	"github.com/suifengpiao14/sqlexec/sqlexecparser"
 )
 
-var createDDLStr = `CREATE TABLE ad.plan (
+var createDDLStr = `
+CREATE TABLE ad.plan (
 	id int(11) NOT NULL AUTO_INCREMENT COMMENT '主键',
 	advertiser_id varchar(32) NOT NULL COMMENT '广告主',
 	name varchar(32) NOT NULL COMMENT '名称',
@@ -53,7 +56,19 @@ var createDDLStr = `CREATE TABLE ad.plan (
 `
 
 func TestParseCreateDDL(t *testing.T) {
-	table, err := sqlexecparser.ParseCreateDDL(createDDLStr)
+	tables, err := sqlexecparser.ParseDDL(createDDLStr)
 	require.NoError(t, err)
-	fmt.Println(table.String())
+	fmt.Println(tables.String())
+}
+
+func TestRegisterTableByDDL(t *testing.T) {
+	err := sqlexec.RegisterTableByDDL(createDDLStr)
+	require.NoError(t, err)
+}
+
+func TestGetDBNameFromDSN(t *testing.T) {
+	dsn := `xyxzapps:p3Ry5prmNHIxfd@tcp(hjx.m.mysql.hsb.com:3306)/xyxz_manage_db?charset=utf8&timeout=1s&readTimeout=5s&writeTimeout=5s&parseTime=False&loc=Local&multiStatements=true`
+	dbname, err := sqlexec.GetDBNameFromDSN(dsn)
+	require.NoError(t, err)
+	assert.Equal(t, dbname, "xyxz_manage_db")
 }

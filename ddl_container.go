@@ -1,4 +1,4 @@
-package sqlexecparser
+package sqlexec
 
 import (
 	"fmt"
@@ -6,6 +6,7 @@ import (
 	"sync"
 
 	"github.com/pkg/errors"
+	"github.com/suifengpiao14/sqlexec/sqlexecparser"
 )
 
 var tablePool sync.Map
@@ -13,9 +14,11 @@ var tablePool sync.Map
 func getTablePoolKey(database string, tableName string) (key string) {
 	return fmt.Sprintf("%s_%s", database, tableName)
 }
-func RegisterTable(database string, table Table) {
-	key := getTablePoolKey(database, table.TableName)
-	tablePool.Store(key, &table)
+func RegisterTable(database string, tables ...sqlexecparser.Table) {
+	for _, table := range tables {
+		key := getTablePoolKey(database, table.TableName)
+		tablePool.Store(key, &table)
+	}
 }
 
 var (
@@ -23,14 +26,14 @@ var (
 	ERROR_INVALID_TYPE    = errors.New("invalid type, except *parser.Table")
 )
 
-func GetTable(database string, tableName string) (table *Table, err error) {
+func GetTable(database string, tableName string) (table *sqlexecparser.Table, err error) {
 	key := getTablePoolKey(database, tableName)
 	v, ok := tablePool.Load(key)
 	if !ok {
 		err = errors.WithMessagef(ERROR_NOT_FOUND_TABLE, "%s", key)
 		return nil, err
 	}
-	table, ok = v.(*Table)
+	table, ok = v.(*sqlexecparser.Table)
 	if !ok {
 		return nil, ERROR_INVALID_TYPE
 	}
@@ -38,13 +41,13 @@ func GetTable(database string, tableName string) (table *Table, err error) {
 }
 
 // RegisterTableByDDL 通过ddl语句注册表结构,避免依赖db连接,方便本地化启动模块
-func RegisterTableByDDL(database string, ddlStatements string) (err error) {
-	tables, err := ParseCreateDDL(ddlStatements)
+func RegisterTableByDDL(ddlStatements string) (err error) {
+	tables, err := sqlexecparser.ParseDDL(ddlStatements)
 	if err != nil {
 		return err
 	}
-	for _, table := range tables {
-		RegisterTable(database, table)
+	for dbName, tabs := range tables.GroupByDBName() {
+		RegisterTable(dbName, tabs...)
 	}
 	return nil
 }
