@@ -1,4 +1,4 @@
-package sqlexec_test
+package sqlexecparser_test
 
 import (
 	"fmt"
@@ -6,7 +6,6 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/suifengpiao14/sqlexec"
 	"github.com/suifengpiao14/sqlexec/sqlexecparser"
 )
 
@@ -62,13 +61,13 @@ func TestParseCreateDDL(t *testing.T) {
 }
 
 func TestRegisterTableByDDL(t *testing.T) {
-	err := sqlexec.RegisterTableByDDL(createDDLStr)
+	err := sqlexecparser.RegisterTableByDDL(createDDLStr)
 	require.NoError(t, err)
 }
 
 func TestGetDBNameFromDSN(t *testing.T) {
 	dsn := `xyxzapps:p3Ry5prmNHIxfd@tcp(hjx.m.mysql.hsb.com:3306)/xyxz_manage_db?charset=utf8&timeout=1s&readTimeout=5s&writeTimeout=5s&parseTime=False&loc=Local&multiStatements=true`
-	dbname, err := sqlexec.GetDBNameFromDSN(dsn)
+	dbname, err := sqlexecparser.GetDBNameFromDSN(dsn)
 	require.NoError(t, err)
 	assert.Equal(t, dbname, "xyxz_manage_db")
 }

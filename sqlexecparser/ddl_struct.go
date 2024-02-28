@@ -2,6 +2,7 @@ package sqlexecparser
 
 import (
 	"encoding/json"
+	"fmt"
 	"strings"
 
 	"github.com/pkg/errors"
@@ -177,6 +178,8 @@ func (cs Constraints) GetByType(typ string) (c *Constraint, ok bool) {
 }
 
 type Column struct {
+	DBName        string   `json:"dbName"`
+	TableName     string   `json:"tableName"`
 	ColumnName    string   `json:"columnName"`
 	DBType        string   `json:"dbType"`
 	GoType        string   `json:"goType"`
@@ -190,6 +193,12 @@ type Column struct {
 	DefaultValue  string   `json:"defaultValue"`
 	OnUpdate      bool     `json:"onUpdate,string"`
 	Unsigned      bool     `json:"unsigned,string"`
+}
+
+func (c Column) FieldFullname() (fullname string) {
+	fullname = fmt.Sprintf("%s.%s.%s", c.DBName, c.TableName, c.ColumnName)
+	fullname = strings.Trim(fullname, ".")
+	return fullname
 }
 
 type Columns []Column
@@ -222,6 +231,15 @@ func (cs Columns) GetByNames(names ...string) (columns Columns, err error) {
 		}
 	}
 	return columns, nil
+}
+
+//GetNames 获取所有的列 名称
+func (cs Columns) GetNames() (columnNames []string) {
+	columnNames = make([]string, 0)
+	for _, c := range cs {
+		columnNames = append(columnNames, c.ColumnName)
+	}
+	return columnNames
 }
 
 // IsDefaultValueCurrentTimestamp 判断默认值是否为自动填充时间

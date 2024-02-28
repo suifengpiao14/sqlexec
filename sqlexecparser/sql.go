@@ -4,8 +4,11 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"reflect"
 	"regexp"
 	"strings"
+
+	"github.com/pkg/errors"
 
 	"github.com/blastrain/vitess-sqlparser/sqlparser"
 )
@@ -31,28 +34,61 @@ type Comment struct {
 
 type ColumnValue struct {
 	Column   string `json:"column"`   //列
-	Value    string `json:"value"`    //值
+	Value    any    `json:"value"`    //值
 	Operator string `json:"operator"` // 操作
 }
 
-/*
-func (c ColumnValue) MarshalJSON() ([]byte, error) {
-	var w bytes.Buffer
-	w.WriteByte('{')
-	w.WriteString(fmt.Sprintf(`"column":"%s",`, c.Column))
-	w.WriteString(fmt.Sprintf(`"value":"%s",`, c.Value))
-	w.WriteString(fmt.Sprintf(`"operator":"%s"`, c.Operator))
-	w.WriteByte('}')
-	s := w.String()
-	return []byte(s), nil
+//MakeComparisonExpr 转换成where 比较表达式
+func (cv ColumnValue) ComparisonExpr() (comparisonExpr *sqlparser.ComparisonExpr) {
+	colName, op, value := cv.Column, cv.Operator, cv.Value
+	rv := reflect.Indirect(reflect.ValueOf(value))
+	rt := rv.Type()
+	var val []byte
+	typ := sqlparser.StrVal
+	switch rt.Kind() {
+	case reflect.Array, reflect.Slice:
+		switch rt.Elem().Kind() { //[]byte 类型单独处理
+		case reflect.Uint8:
+			val = rv.Bytes()
+		default:
+			b, err := json.Marshal(value)
+			if err != nil {
+				panic(err) // 此处一般不会有错误，正常可以遍历数组元素组装数据，用json只是方便
+			}
+			val = bytes.Trim(b, "[]")
+		}
+	case reflect.Int, reflect.Int64:
+		typ = sqlparser.IntVal
+	case reflect.Float64:
+		typ = sqlparser.FloatVal
+	default:
+		s := ""
+		strT := reflect.TypeOf(s)
+		if rv.CanConvert(strT) {
+			typ = sqlparser.StrVal
+			val = []byte(rv.String())
+		} else {
+			err := errors.Errorf("value type unexpected ,want string,array,[]byte,got:%s", rt.String())
+			panic(err)
+		}
+	}
+
+	valExpr := &sqlparser.SQLVal{Type: typ, Val: val}
+	colIdent := sqlparser.NewColIdent(colName)
+	col := &sqlparser.ColName{Name: colIdent}
+	comparisonExpr = &sqlparser.ComparisonExpr{
+		Operator: op,
+		Left:     col,
+		Right:    valExpr,
+	}
+	return comparisonExpr
 }
-*/
 
 type ColumnValues []ColumnValue
 
-func (cvs *ColumnValues) Array() (columns []string, values []string) {
+func (cvs *ColumnValues) Array() (columns []string, values []any) {
 	columns = make([]string, 0)
-	values = make([]string, 0)
+	values = make([]any, 0)
 	for _, cv := range *cvs {
 		columns = append(columns, cv.Column)
 		values = append(values, cv.Value)
@@ -76,6 +112,49 @@ func (c ColumnValues) GetByColumn(column string, operator string) (col *ColumnVa
 		}
 	}
 	return nil, false
+}
+
+//FilterByColName 通过列名称过滤
+func (c ColumnValues) FilterByColName(colNames ...string) (subColVals ColumnValues) {
+	subColVals = make(ColumnValues, 0)
+	for _, column := range colNames {
+		for _, columnValue := range c {
+			if columnValue.Column == column {
+				subColVals.AddIgnore(columnValue)
+			}
+		}
+	}
+
+	return subColVals
+}
+
+func (cvs ColumnValues) WhereAndExpr() (sqlWhere *sqlparser.Where) {
+	selec := sqlparser.Select{}
+	if len(cvs) == 0 { // 确保一定存在
+		cv := ColumnValue{
+			Column:   "1",
+			Value:    1,
+			Operator: sqlparser.EqualStr,
+		}
+		selec = sqlparser.Select{
+			Where: sqlparser.NewWhere(sqlparser.WhereStr, cv.ComparisonExpr()),
+		}
+	}
+
+	for i, cv := range cvs {
+		expr := cv.ComparisonExpr()
+		if i == 0 {
+			selec.Where = sqlparser.NewWhere(sqlparser.WhereStr, expr)
+			continue
+		}
+		andExpr := &sqlparser.AndExpr{
+			Left:  selec.Where.Expr,
+			Right: expr,
+		}
+		selec.AddWhere(andExpr)
+	}
+	return selec.Where
+
 }
 
 type SQLTpl struct {
@@ -217,14 +296,12 @@ func ParseSQL(sqlStr string) (sqlTpl *SQLTpl, err error) {
 			whereColumnValues := ParseWhere(stmt.Where)
 			sqlTpl.Where.AddIgnore(whereColumnValues...)
 			// 构建where占位符
-			valExpr := &sqlparser.SQLVal{Type: sqlparser.StrVal, Val: []byte(PlaceHolder_Where_Value)}
-			colIdent := sqlparser.NewColIdent(PlaceHolder_Where_Column)
-			colName := &sqlparser.ColName{Name: colIdent}
-			whereExpr := &sqlparser.ComparisonExpr{
+			cv := ColumnValue{
+				Column:   PlaceHolder_Where_Column,
 				Operator: sqlparser.EqualStr,
-				Left:     colName,
-				Right:    valExpr,
+				Value:    []byte(PlaceHolder_Where_Value),
 			}
+			whereExpr := cv.ComparisonExpr()
 			stmt.Where = sqlparser.NewWhere(sqlparser.WhereStr, whereExpr)
 		}
 		// 构建set占位符
@@ -259,15 +336,12 @@ func ParseSQL(sqlStr string) (sqlTpl *SQLTpl, err error) {
 		whereColumnValues := ParseWhere(stmt.Where)
 		sqlTpl.Where.AddIgnore(whereColumnValues...)
 		// 构建where占位符
-		valExpr := &sqlparser.SQLVal{Type: sqlparser.StrVal, Val: []byte(PlaceHolder_Where_Value)}
-		colIdent := sqlparser.NewColIdent(PlaceHolder_Where_Column)
-		colName := &sqlparser.ColName{Name: colIdent}
-		whereExpr := &sqlparser.ComparisonExpr{
+		cv := ColumnValue{
+			Column:   PlaceHolder_Where_Column,
 			Operator: sqlparser.EqualStr,
-			Left:     colName,
-			Right:    valExpr,
+			Value:    PlaceHolder_Where_Value,
 		}
-		stmt.Where = sqlparser.NewWhere(sqlparser.WhereStr, whereExpr)
+		stmt.Where = sqlparser.NewWhere(sqlparser.WhereStr, cv.ComparisonExpr())
 		sqlTpl.Tpl = sqlparser.String(stmt)
 	}
 	return sqlTpl, nil

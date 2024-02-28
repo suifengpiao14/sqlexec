@@ -195,13 +195,14 @@ func ConvertTabDef2Table(tableDef executor.TableDef) (table *Table, err error) {
 		}
 	}
 	for _, columnDef := range tableDef.Columns {
-
 		goType, size, err := mysql2GoType(columnDef.Type, true)
 
 		if err != nil {
 			return nil, err
 		}
 		column := Column{
+			DBName:        table.DBName,
+			TableName:     table.TableName,
 			ColumnName:    columnDef.Name,
 			DBType:        columnDef.Type,
 			GoType:        goType,
