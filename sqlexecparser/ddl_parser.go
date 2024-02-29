@@ -3,6 +3,7 @@ package sqlexecparser
 import (
 	"fmt"
 	"regexp"
+	"sort"
 	"strconv"
 	"strings"
 
@@ -36,17 +37,59 @@ func ParseDDL(ddls string) (tables Tables, err error) {
 			tables = append(tables, *table)
 		}
 	}
+	sort.Sort(tables)
 	return tables, nil
 
 }
 
+// splitDDLStatements 使用逐个字符读取方式分割 DDL 语句（排除在引号内的分号）
+func splitDDLStatements(batchDDL string) []string {
+	var statements []string
+	var currentStatement strings.Builder
+	var insideSingleQuote, insideDoubleQuote bool
+
+	for _, char := range batchDDL {
+		currentStatement.WriteRune(char)
+
+		switch char {
+		case ';':
+			if !insideSingleQuote && !insideDoubleQuote {
+				s := currentStatement.String()
+				statements = append(statements, s)
+				currentStatement.Reset()
+			}
+		case '\'':
+			insideSingleQuote = !insideSingleQuote
+		case '"':
+			insideDoubleQuote = !insideDoubleQuote
+		}
+	}
+
+	// 去除空白语句
+	var nonEmptyStatements []string
+	for _, statement := range statements {
+		trimmed := strings.TrimSpace(statement)
+		if trimmed != "" {
+			nonEmptyStatements = append(nonEmptyStatements, trimmed)
+		}
+	}
+
+	return nonEmptyStatements
+}
+
+const (
+	// 需要加``,否则关键词作为库名、表名、列明会报错 如 replace
+	Create_DB_SQL_Format = "create database `%s` CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci;"
+	Use_DB_SQL_Format    = "use `%s`;"
+)
+
 // TryExecDDLs 尝试解析ddls,其中,包含数据库不存在情况,自动创建
 func TryExecDDLs(ddls string) (db *executor.Executor, err error) {
-	ddls = RemoveComments(ddls)
+	//ddls = RemoveComments(ddls) // 'xxx#xx' 单引号中的# 有问题，这个地方感觉无需要去除注释，暂时注释，后续需要再完善
 	conf := executor.NewDefaultConfig()
 	db = executor.NewExecutor(conf)
 	ddls = strings.Join(strings.Fields(ddls), " ")
-	sqls := strings.Split(ddls, ";")
+	sqls := splitDDLStatements(ddls)
 	for _, sql := range sqls {
 		if sql == "" {
 			continue
@@ -57,6 +100,7 @@ func TryExecDDLs(ddls string) (db *executor.Executor, err error) {
 		}
 		executorErr, ok := err.(*executor.Error)
 		if !ok {
+			err = errors.WithMessagef(err, "db:%s,ddl:%s", db.GetCurrentDatabase(), sql)
 			return nil, err
 		}
 		switch executorErr.Code() {
@@ -67,30 +111,37 @@ func TryExecDDLs(ddls string) (db *executor.Executor, err error) {
 				return nil, err
 			}
 			if dbName != "" {
-				sql = fmt.Sprintf("create database `%s` CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci; use %s;%s", dbName, dbName, sql)
+				arr := []string{
+					fmt.Sprintf(Create_DB_SQL_Format, dbName),
+					fmt.Sprintf(Use_DB_SQL_Format, dbName),
+					sql,
+				}
+				sql = strings.Join(arr, "")
 				err = db.Exec(sql)
 				if err != nil {
+					err = errors.WithMessagef(err, "db:%s,ddl:%s", db.GetCurrentDatabase(), sql)
 					return nil, err
 				}
 			}
 		case executor.ErrNoDB.Code():
 			databases := db.GetDatabases()
 			for _, dbName := range databases { // 默认使用第一个数据库
-				sql = fmt.Sprintf("use %s;%s", dbName, sql)
+				sql = strings.Join([]string{
+					fmt.Sprintf(Use_DB_SQL_Format, dbName),
+					sql,
+				}, "")
 				err = db.Exec(sql) // 重新设置error
 				if err != nil {
+					err = errors.WithMessagef(err, "db:%s,ddl:%s", db.GetCurrentDatabase(), sql)
 					return nil, err
 				}
 				break
 			}
 		}
 		if err != nil { // err 处理不了，直接返回
+			err = errors.WithMessagef(err, "db:%s,ddl:%s", db.GetCurrentDatabase(), sql)
 			return nil, err
 		}
-	}
-
-	if err != nil {
-		return nil, err
 	}
 	return db, nil
 }
@@ -100,7 +151,7 @@ const (
 )
 
 func getDatabaseNameFromError(executorErr executor.Error, format string) (dbName string, err error) {
-	_, err = fmt.Sscanf(executorErr.Error(), ERROR_UNKNOW_DATABASE_SCAN_FORMAT, &dbName)
+	_, err = fmt.Sscanf(executorErr.Error(), format, &dbName)
 	if err != nil {
 		return "", err
 	}

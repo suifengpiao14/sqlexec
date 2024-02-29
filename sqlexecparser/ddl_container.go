@@ -3,6 +3,8 @@ package sqlexecparser
 import (
 	"fmt"
 	"regexp"
+	"sort"
+	"strings"
 	"sync"
 
 	"github.com/pkg/errors"
@@ -10,19 +12,15 @@ import (
 
 var tablePool sync.Map
 
-type TablePoolKey struct {
-	DBName    string `json:"DBName"`
-	TableName string `json:"TableName"`
-}
+func getTablePoolKey(database DBName, tableName TableName) (key string) {
 
-func getTablePoolKey(database DBName, tableName TableName) (key TablePoolKey) {
-
-	return TablePoolKey{
-		DBName:    database.Base(),
-		TableName: tableName.Base(),
-	}
+	return fmt.Sprintf("%s.%s", database.Base(), tableName.Base())
 }
 func RegisterTable(database DBName, tables ...Table) {
+	sort.Sort(Tables(tables)) // 排序，方便调试排查
+	if strings.EqualFold(database.Base(), "xyxz_manage_db") {
+		fmt.Println(tables)
+	}
 	for _, table := range tables {
 		key := getTablePoolKey(database, TableName(table.TableName))
 		cp := table //此处必须重新赋值，再取地址，否则会编程引用同一个变量

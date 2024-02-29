@@ -38,59 +38,64 @@ type ColumnValue struct {
 	Operator string     `json:"operator"` // 操作
 }
 
-//MakeComparisonExpr 转换成where 比较表达式
-func (cv ColumnValue) ComparisonExpr() (comparisonExpr *sqlparser.ComparisonExpr) {
-	op, value := cv.Operator, cv.Value
-	comparisonExpr = &sqlparser.ComparisonExpr{
-		Operator: op,
-		Left:     cv.Column.SqlparserColName(),
+//Value2Expr将值转换为 sqlparser.ValTuple,sqlparser.SQLVal  等值
+func Value2Expr(value any) (expr sqlparser.Expr) {
+	// sqlparser.Expr  类型，直接构造返回
+	if expr, ok := value.(sqlparser.Expr); ok {
+		return expr
 	}
-
-	// sqlparser.SQLVal *sqlparser.SQLVal 类型，直接构造返回
-	var valExpr *sqlparser.SQLVal
-	if sqlVal, ok := value.(sqlparser.SQLVal); ok {
-		valExpr = &sqlVal
-		comparisonExpr.Right = valExpr
-		return comparisonExpr
-	}
-	if sqlVal, ok := value.(*sqlparser.SQLVal); ok {
-		valExpr = sqlVal
-		comparisonExpr.Right = valExpr
-		return comparisonExpr
-	}
-
-	typ := sqlparser.StrVal
-	var val []byte
 	rv := reflect.Indirect(reflect.ValueOf(value))
 	rt := rv.Type()
+	var val []byte
 	switch rt.Kind() {
 	case reflect.Array, reflect.Slice:
-		switch rt.Elem().Kind() { //[]byte 类型单独处理
+		elemT := rt.Elem()
+		if elemT.Kind() == reflect.Ptr {
+			elemT = elemT.Elem()
+		}
+		switch elemT.Kind() { //[]byte 类型单独处理
 		case reflect.Uint8:
 			val = rv.Bytes()
+			return sqlparser.NewStrVal(val) // 暂时返回字符串类型
 		default:
-			b, err := json.Marshal(value)
-			if err != nil {
-				panic(err) // 此处一般不会有错误，正常可以遍历数组元素组装数据，用json只是方便
+			tupleExpr := sqlparser.ValTuple{}
+			for i := 0; i < rv.Len(); i++ {
+				elementValue := rv.Index(i)
+				// 将 reflect.Value 转换为具体类型的值
+				element := elementValue.Interface()
+				subExpr := Value2Expr(element)
+				tupleExpr = append(tupleExpr, subExpr)
 			}
-			val = bytes.Trim(b, "[]")
+			return tupleExpr
+
 		}
 	case reflect.Int, reflect.Int64:
-		typ = sqlparser.IntVal
+		b := []byte(fmt.Sprintf("%d", rv.Int()))
+		return sqlparser.NewIntVal(b)
+
 	case reflect.Float64:
-		typ = sqlparser.FloatVal
+		valFloat := rv.Float()
+		floatString := fmt.Sprintf("%f", valFloat)
+		byteSlice := []byte(floatString)
+		return sqlparser.NewFloatVal(byteSlice)
 	default:
-		s := ""
-		strT := reflect.TypeOf(s)
+		strT := reflect.TypeOf("")
 		if rv.CanConvert(strT) {
-			typ = sqlparser.StrVal
 			val = []byte(rv.String())
-		} else {
-			err := errors.Errorf("value type unexpected ,want string,array,[]byte,got:%s", rt.String())
-			panic(err)
+			return sqlparser.NewStrVal(val)
 		}
+		err := errors.Errorf("value type unexpected ,want string,array,[]byte,got:%s", rt.String())
+		panic(err)
 	}
-	valExpr = &sqlparser.SQLVal{Type: typ, Val: val}
+}
+
+//MakeComparisonExpr 转换成where 比较表达式
+func (cv ColumnValue) ComparisonExpr() (comparisonExpr *sqlparser.ComparisonExpr) {
+	comparisonExpr = &sqlparser.ComparisonExpr{
+		Operator: cv.Operator,
+		Left:     cv.Column.SqlparserColName(),
+		Right:    Value2Expr(cv.Value),
+	}
 	return comparisonExpr
 }
 

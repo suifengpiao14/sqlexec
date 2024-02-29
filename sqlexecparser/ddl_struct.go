@@ -26,7 +26,16 @@ type Table struct {
 	Constraints Constraints `json:"constraints"`
 }
 
+func (t Table) Fullname() (fullname string) {
+	fullname = fmt.Sprintf("`%s`.`%s`", t.DBName.Base(), t.TableName.Base())
+	return fullname
+}
+
 type Tables []Table
+
+func (a Tables) Len() int           { return len(a) }
+func (a Tables) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
+func (a Tables) Less(i, j int) bool { return a[i].Fullname() < a[j].Fullname() }
 
 func (tbs Tables) String() string {
 	b, err := json.Marshal(tbs)
