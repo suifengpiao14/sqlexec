@@ -33,18 +33,36 @@ type Comment struct {
 }
 
 type ColumnValue struct {
-	Column   string `json:"column"`   //列
-	Value    any    `json:"value"`    //值
-	Operator string `json:"operator"` // 操作
+	Column   ColumnName `json:"column"`   //列
+	Value    any        `json:"value"`    //值
+	Operator string     `json:"operator"` // 操作
 }
 
 //MakeComparisonExpr 转换成where 比较表达式
 func (cv ColumnValue) ComparisonExpr() (comparisonExpr *sqlparser.ComparisonExpr) {
-	colName, op, value := cv.Column, cv.Operator, cv.Value
+	op, value := cv.Operator, cv.Value
+	comparisonExpr = &sqlparser.ComparisonExpr{
+		Operator: op,
+		Left:     cv.Column.SqlparserColName(),
+	}
+
+	// sqlparser.SQLVal *sqlparser.SQLVal 类型，直接构造返回
+	var valExpr *sqlparser.SQLVal
+	if sqlVal, ok := value.(sqlparser.SQLVal); ok {
+		valExpr = &sqlVal
+		comparisonExpr.Right = valExpr
+		return comparisonExpr
+	}
+	if sqlVal, ok := value.(*sqlparser.SQLVal); ok {
+		valExpr = sqlVal
+		comparisonExpr.Right = valExpr
+		return comparisonExpr
+	}
+
+	typ := sqlparser.StrVal
+	var val []byte
 	rv := reflect.Indirect(reflect.ValueOf(value))
 	rt := rv.Type()
-	var val []byte
-	typ := sqlparser.StrVal
 	switch rt.Kind() {
 	case reflect.Array, reflect.Slice:
 		switch rt.Elem().Kind() { //[]byte 类型单独处理
@@ -72,22 +90,14 @@ func (cv ColumnValue) ComparisonExpr() (comparisonExpr *sqlparser.ComparisonExpr
 			panic(err)
 		}
 	}
-
-	valExpr := &sqlparser.SQLVal{Type: typ, Val: val}
-	colIdent := sqlparser.NewColIdent(colName)
-	col := &sqlparser.ColName{Name: colIdent}
-	comparisonExpr = &sqlparser.ComparisonExpr{
-		Operator: op,
-		Left:     col,
-		Right:    valExpr,
-	}
+	valExpr = &sqlparser.SQLVal{Type: typ, Val: val}
 	return comparisonExpr
 }
 
 type ColumnValues []ColumnValue
 
-func (cvs *ColumnValues) Array() (columns []string, values []any) {
-	columns = make([]string, 0)
+func (cvs *ColumnValues) Array() (columns []ColumnName, values []any) {
+	columns = make([]ColumnName, 0)
 	values = make([]any, 0)
 	for _, cv := range *cvs {
 		columns = append(columns, cv.Column)
@@ -105,7 +115,7 @@ func (cvs *ColumnValues) AddIgnore(columnValues ...ColumnValue) {
 	}
 }
 
-func (c ColumnValues) GetByColumn(column string, operator string) (col *ColumnValue, ok bool) {
+func (c ColumnValues) GetByColumn(column ColumnName, operator string) (col *ColumnValue, ok bool) {
 	for _, columnValue := range c {
 		if columnValue.Column == column && strings.EqualFold(columnValue.Operator, operator) {
 			return &columnValue, true
@@ -115,11 +125,11 @@ func (c ColumnValues) GetByColumn(column string, operator string) (col *ColumnVa
 }
 
 //FilterByColName 通过列名称过滤
-func (c ColumnValues) FilterByColName(colNames ...string) (subColVals ColumnValues) {
+func (c ColumnValues) FilterByColName(colNames ...ColumnName) (subColVals ColumnValues) {
 	subColVals = make(ColumnValues, 0)
 	for _, column := range colNames {
 		for _, columnValue := range c {
-			if columnValue.Column == column {
+			if columnValue.Column.EqualFold(column) {
 				subColVals.AddIgnore(columnValue)
 			}
 		}
@@ -286,7 +296,7 @@ func ParseSQL(sqlStr string) (sqlTpl *SQLTpl, err error) {
 			colName := expr.Name.Name.String()
 			colValue := sqlparser.String(expr.Expr)
 			sqlTpl.Update.AddIgnore(ColumnValue{
-				Column:   colName,
+				Column:   ColumnName(colName),
 				Value:    colValue,
 				Operator: "=",
 			})
@@ -318,7 +328,7 @@ func ParseSQL(sqlStr string) (sqlTpl *SQLTpl, err error) {
 	case *sqlparser.Insert:
 		for _, column := range stmt.Columns {
 			sqlTpl.Insert.AddIgnore(ColumnValue{
-				Column: column.String(),
+				Column: ColumnName(column.String()),
 			})
 		}
 
@@ -355,7 +365,7 @@ func ParseWhere(whereExpr *sqlparser.Where) (columnValues ColumnValues) {
 			whereCol := sqlparser.String(expr.Left)
 			whereVal := sqlparser.String(expr.Right)
 			columnValues.AddIgnore(ColumnValue{
-				Column:   whereCol,
+				Column:   ColumnName(whereCol),
 				Value:    whereVal,
 				Operator: expr.Operator,
 			})

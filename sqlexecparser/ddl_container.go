@@ -10,13 +10,23 @@ import (
 
 var tablePool sync.Map
 
-func getTablePoolKey(database string, tableName string) (key string) {
-	return fmt.Sprintf("%s_%s", database, tableName)
+type TablePoolKey struct {
+	DBName    string `json:"DBName"`
+	TableName string `json:"TableName"`
 }
-func RegisterTable(database string, tables ...Table) {
+
+func getTablePoolKey(database DBName, tableName TableName) (key TablePoolKey) {
+
+	return TablePoolKey{
+		DBName:    database.Base(),
+		TableName: tableName.Base(),
+	}
+}
+func RegisterTable(database DBName, tables ...Table) {
 	for _, table := range tables {
-		key := getTablePoolKey(database, table.TableName)
-		tablePool.Store(key, &table)
+		key := getTablePoolKey(database, TableName(table.TableName))
+		cp := table //此处必须重新赋值，再取地址，否则会编程引用同一个变量
+		tablePool.Store(key, &cp)
 	}
 }
 
@@ -25,7 +35,7 @@ var (
 	ERROR_INVALID_TYPE    = errors.New("invalid type, except *parser.Table")
 )
 
-func GetTable(database string, tableName string) (table *Table, err error) {
+func GetTable(database DBName, tableName TableName) (table *Table, err error) {
 	key := getTablePoolKey(database, tableName)
 	v, ok := tablePool.Load(key)
 	if !ok {
@@ -45,7 +55,8 @@ func RegisterTableByDDL(ddlStatements string) (err error) {
 	if err != nil {
 		return err
 	}
-	for dbName, tabs := range tables.GroupByDBName() {
+	m := tables.GroupByDBName()
+	for dbName, tabs := range m {
 		RegisterTable(dbName, tabs...)
 	}
 	return nil

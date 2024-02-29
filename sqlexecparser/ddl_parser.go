@@ -61,25 +61,27 @@ func TryExecDDLs(ddls string) (db *executor.Executor, err error) {
 		}
 		switch executorErr.Code() {
 		case executor.ErrBadDB.Code():
-			dbName, err := getDatabaseNameFromError(*executorErr, ERROR_UNKNOW_DATABASE_SCAN_FORMAT)
+			var dbName string
+			dbName, err = getDatabaseNameFromError(*executorErr, ERROR_UNKNOW_DATABASE_SCAN_FORMAT) //此处error 必须使用外部err
 			if err != nil {
 				return nil, err
 			}
 			if dbName != "" {
 				sql = fmt.Sprintf("create database `%s` CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci; use %s;%s", dbName, dbName, sql)
 				err = db.Exec(sql)
-				if err == nil {
-					continue
+				if err != nil {
+					return nil, err
 				}
 			}
 		case executor.ErrNoDB.Code():
 			databases := db.GetDatabases()
-			if len(databases) == 1 {
-				sql = fmt.Sprintf("use %s;%s", databases[0], sql)
+			for _, dbName := range databases { // 默认使用第一个数据库
+				sql = fmt.Sprintf("use %s;%s", dbName, sql)
 				err = db.Exec(sql) // 重新设置error
-				if err == nil {
-					continue
+				if err != nil {
+					return nil, err
 				}
+				break
 			}
 		}
 		if err != nil { // err 处理不了，直接返回
@@ -88,9 +90,9 @@ func TryExecDDLs(ddls string) (db *executor.Executor, err error) {
 	}
 
 	if err != nil {
-		return
+		return nil, err
 	}
-	return
+	return db, nil
 }
 
 const (
@@ -180,8 +182,8 @@ func mysql2GoType(mysqlType string, time2str bool) (goType string, size int, err
 
 func ConvertTabDef2Table(tableDef executor.TableDef) (table *Table, err error) {
 	table = &Table{
-		DBName:      tableDef.Database,
-		TableName:   tableDef.Name,
+		DBName:      DBName(tableDef.Database),
+		TableName:   TableName(tableDef.Name),
 		Columns:     make(Columns, 0),
 		Comment:     tableDef.Comment,
 		Constraints: make(Constraints, 0),
@@ -189,9 +191,9 @@ func ConvertTabDef2Table(tableDef executor.TableDef) (table *Table, err error) {
 	for _, indice := range tableDef.Indices {
 		switch indice.Key {
 		case executor.IndexType_PRI:
-			table.Constraints.Add(Constraint_Type_Primary, indice.Columns...)
+			table.Constraints.Add(Constraint_Type_Primary, ToColumnName(indice.Columns...)...)
 		case executor.IndexType_UNI:
-			table.Constraints.Add(Constraint_Type_Uniqueue, indice.Columns...)
+			table.Constraints.Add(Constraint_Type_Uniqueue, ToColumnName(indice.Columns...)...)
 		}
 	}
 	for _, columnDef := range tableDef.Columns {
@@ -203,7 +205,7 @@ func ConvertTabDef2Table(tableDef executor.TableDef) (table *Table, err error) {
 		column := Column{
 			DBName:        table.DBName,
 			TableName:     table.TableName,
-			ColumnName:    columnDef.Name,
+			ColumnName:    ColumnName(columnDef.Name),
 			DBType:        columnDef.Type,
 			GoType:        goType,
 			Comment:       columnDef.Comment,
@@ -217,6 +219,9 @@ func ConvertTabDef2Table(tableDef executor.TableDef) (table *Table, err error) {
 			OnUpdate:      columnDef.OnUpdate,
 			Unsigned:      columnDef.Unsigned,
 		}
+
+		column.PrimaryKey = column.PrimaryKey || table.Constraints.IsPrimaryKeyPart(column.ColumnName) // 补充主键
+		column.UniqKey = column.UniqKey || table.Constraints.IsUniqKeyPart(column.ColumnName)          // 补充唯一键
 
 		table.Columns = append(table.Columns, column)
 	}
