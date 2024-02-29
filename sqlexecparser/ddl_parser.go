@@ -116,7 +116,7 @@ func RemoveComments(query string) string {
 }
 
 // map for converting mysql type to golang types
-var typeForMysqlToGo = map[string]string{
+var TypeForMysqlToGo = map[string]string{
 	"int":                "int",
 	"integer":            "int",
 	"tinyint":            "int",
@@ -154,12 +154,12 @@ var typeForMysqlToGo = map[string]string{
 	"varbinary":          "string",
 }
 
-func mysql2GoType(mysqlType string, time2str bool) (goType string, size int, err error) {
+func Mysql2GoType(mysqlType string, time2str bool) (goType string, size int, err error) {
 	if time2str {
-		typeForMysqlToGo["date"] = "string"
-		typeForMysqlToGo["datetime"] = "string"
-		typeForMysqlToGo["timestamp"] = "string"
-		typeForMysqlToGo["time"] = "string"
+		TypeForMysqlToGo["date"] = "string"
+		TypeForMysqlToGo["datetime"] = "string"
+		TypeForMysqlToGo["timestamp"] = "string"
+		TypeForMysqlToGo["time"] = "string"
 	}
 	subType := mysqlType
 	index := strings.Index(mysqlType, "(")
@@ -172,7 +172,7 @@ func mysql2GoType(mysqlType string, time2str bool) (goType string, size int, err
 		subType = mysqlType[:index]
 
 	}
-	goType, ok := typeForMysqlToGo[subType]
+	goType, ok := TypeForMysqlToGo[subType]
 	if !ok {
 		err = errors.Errorf("mysql2GoType: not found mysql type %s to go type", mysqlType)
 	}
@@ -197,7 +197,7 @@ func ConvertTabDef2Table(tableDef executor.TableDef) (table *Table, err error) {
 		}
 	}
 	for _, columnDef := range tableDef.Columns {
-		goType, size, err := mysql2GoType(columnDef.Type, true)
+		goType, size, err := Mysql2GoType(columnDef.Type, true)
 
 		if err != nil {
 			return nil, err
