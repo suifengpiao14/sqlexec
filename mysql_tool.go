@@ -95,7 +95,6 @@ func GetDDL(db *sql.DB) (ddl string, err error) {
 		arr = append(arr, createTableSQL)
 	}
 	ddl = strings.Join(arr, ";\n")
-	ddl = fmt.Sprintf("%s;\n", ddl) // 最后增加;表示结束
 	err = SetDDLCache(cacheFilename, ddl)
 	if err != nil { // 设置缓存
 		return "", err

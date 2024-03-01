@@ -47,7 +47,7 @@ func splitDDLStatements(batchDDL string) []string {
 	var statements []string
 	var currentStatement strings.Builder
 	var insideSingleQuote, insideDoubleQuote bool
-
+	batchDDL = fmt.Sprintf("%s;", batchDDL) // 最后增加; 确保 最后一个currentStatement 数据也收集了（因为后面有去除空白语句，所以多个;不影响结果）
 	for _, char := range batchDDL {
 		currentStatement.WriteRune(char)
 
