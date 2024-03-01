@@ -18,7 +18,7 @@ require (
 	gorm.io/gorm v1.25.5
 )
 
-replace github.com/bytewatch/ddl-executor => github.com/suifengpiao14/ddl-executor v0.0.0-20220524105604-31a4142e615e
+replace github.com/bytewatch/ddl-executor => github.com/suifengpiao14/ddl-executor v0.0.0-20240228091816-77c6c3208d14
 
 require (
 	github.com/cznic/mathutil v0.0.0-20181122101859-297441e03548 // indirect
@@ -47,7 +47,7 @@ require (
 	golang.org/x/net v0.21.0 // indirect
 	golang.org/x/sys v0.17.0 // indirect
 	golang.org/x/text v0.14.0 // indirect
-	google.golang.org/genproto/googleapis/rpc v0.0.0-20240221002015-b0ce06bbee7c // indirect
+	google.golang.org/genproto/googleapis/rpc v0.0.0-20240228224816-df926f6c8641 // indirect
 	google.golang.org/grpc v1.62.0 // indirect
 	google.golang.org/protobuf v1.32.0 // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect
