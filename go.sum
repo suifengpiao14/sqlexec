@@ -196,8 +196,8 @@ github.com/stretchr/testify v1.8.2/go.mod h1:w2LPCIKwWwSfY2zedu0+kehJoqGctiVI29o
 github.com/stretchr/testify v1.8.4 h1:CcVxjf3Q8PM0mHUKJCdn+eZZtm5yQwehR5yeSVQQcUk=
 github.com/stretchr/testify v1.8.4/go.mod h1:sz/lmYIOXD/1dqDmKjjqLyZ2RngseejIcXlSw2iwfAo=
 github.com/struCoder/pidusage v0.1.2/go.mod h1:pWBlW3YuSwRl6h7R5KbvA4N8oOqe9LjaKW5CwT1SPjI=
-github.com/suifengpiao14/ddl-executor v0.0.0-20240228091816-77c6c3208d14 h1:dNB77OlYWYLDoHEHP9J8442BJzGIy4glIJ3ZR+T72zg=
-github.com/suifengpiao14/ddl-executor v0.0.0-20240228091816-77c6c3208d14/go.mod h1:wEXsB9Xw4x8YOgbOJjC/4hFwFplZFBbxP9qRnm1WtzQ=
+github.com/suifengpiao14/ddl-executor v0.0.1 h1:LV8/bw0eVRDXOdGyimhV1GhE7EJqv8FjZXl2jdtLGmU=
+github.com/suifengpiao14/ddl-executor v0.0.1/go.mod h1:xth76VrJc6+F2bqciefu0/BqMg03UBhQNfaRVmGl3dE=
 github.com/suifengpiao14/funcs v0.0.18 h1:TQZ9EPPnzGBFNIIpHO+I/y38ufO0osZlGtm49P2DNkA=
 github.com/suifengpiao14/funcs v0.0.18/go.mod h1:g95inzlUrS2Vtyvv5SjVFOnOeX7ZBPWwyKuEMMW+g7U=
 github.com/suifengpiao14/logchan/v2 v2.0.22 h1:LhpV9E0ofNRQFEvR9MOF4hSHJes8s/aXn9Z4qdLVPck=

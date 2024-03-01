@@ -7,8 +7,8 @@ import (
 	"strconv"
 	"strings"
 
-	executor "github.com/bytewatch/ddl-executor"
 	"github.com/pkg/errors"
+	executor "github.com/suifengpiao14/ddl-executor"
 )
 
 // ParseDDL 解析sql ddl

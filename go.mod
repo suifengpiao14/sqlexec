@@ -4,12 +4,12 @@ go 1.21.0
 
 require (
 	github.com/blastrain/vitess-sqlparser v0.0.0-20201030050434-a139afbb1aba
-	github.com/bytewatch/ddl-executor v0.0.0-20191006051259-3983fa694bf8
 	github.com/go-sql-driver/mysql v1.7.1
 	github.com/jmoiron/sqlx v1.3.5
 	github.com/pkg/errors v0.9.1
 	github.com/spf13/cast v1.5.1
 	github.com/stretchr/testify v1.8.4
+	github.com/suifengpiao14/ddl-executor v0.0.1
 	github.com/suifengpiao14/funcs v0.0.18
 	github.com/suifengpiao14/logchan/v2 v2.0.22
 	github.com/suifengpiao14/sshmysql v0.0.1
@@ -17,8 +17,6 @@ require (
 	golang.org/x/sync v0.6.0
 	gorm.io/gorm v1.25.5
 )
-
-replace github.com/bytewatch/ddl-executor => github.com/suifengpiao14/ddl-executor v0.0.0-20240228091816-77c6c3208d14
 
 require (
 	github.com/cznic/mathutil v0.0.0-20181122101859-297441e03548 // indirect
