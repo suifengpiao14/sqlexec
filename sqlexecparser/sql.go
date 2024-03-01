@@ -101,8 +101,8 @@ func (cv ColumnValue) ComparisonExpr() (comparisonExpr *sqlparser.ComparisonExpr
 
 type ColumnValues []ColumnValue
 
-func (cvs *ColumnValues) Array() (columns []ColumnName, values []any) {
-	columns = make([]ColumnName, 0)
+func (cvs *ColumnValues) Array() (columns ColumnNames, values []any) {
+	columns = make(ColumnNames, 0)
 	values = make([]any, 0)
 	for _, cv := range *cvs {
 		columns = append(columns, cv.Column)

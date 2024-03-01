@@ -97,8 +97,8 @@ func (t Table) GetUniqKey() (columns Columns, err error) {
 type Constraints []Constraint
 
 type Constraint struct {
-	Type        string       `json:"type"`
-	ColumnNames []ColumnName `json:"columnNames"`
+	Type        string      `json:"type"`
+	ColumnNames ColumnNames `json:"columnNames"`
 }
 
 const (
@@ -108,7 +108,7 @@ const (
 
 func (c *Constraint) AddColumnName(columnNames ...ColumnName) {
 	if c.ColumnNames == nil {
-		c.ColumnNames = make([]ColumnName, 0)
+		c.ColumnNames = make(ColumnNames, 0)
 	}
 	for _, columnName := range columnNames {
 		exists := false
@@ -265,8 +265,18 @@ func (t TableName) SqlparserColName() (tabName *sqlparser.TableName) {
 
 type ColumnName string
 
-func ToColumnName(strs ...string) (cns []ColumnName) {
-	cns = make([]ColumnName, 0)
+type ColumnNames []ColumnName
+
+func (cns ColumnNames) ToString() (strArr []string) {
+	strArr = make([]string, 0)
+	for _, n := range cns {
+		strArr = append(strArr, string(n))
+	}
+	return strArr
+}
+
+func ToColumnName(strs ...string) (cns ColumnNames) {
+	cns = make(ColumnNames, 0)
 	for _, s := range strs {
 		cns = append(cns, ColumnName(s))
 	}
@@ -378,8 +388,8 @@ func (cs Columns) GetByNames(names ...ColumnName) (columns Columns, err error) {
 }
 
 //GetNames 获取所有的列 名称
-func (cs Columns) GetNames() (columnNames []ColumnName) {
-	columnNames = make([]ColumnName, 0)
+func (cs Columns) GetNames() (columnNames ColumnNames) {
+	columnNames = make(ColumnNames, 0)
 	for _, c := range cs {
 		columnNames = append(columnNames, c.ColumnName)
 	}
