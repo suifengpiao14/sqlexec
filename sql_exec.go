@@ -32,6 +32,16 @@ type DBConfig struct {
 	MaxIdleTime int    `json:"maxIdleTime"`
 }
 
+//JsonToDBConfig 内置将json字符串转为DBConfig
+func JsonToDBConfig(s string) (c *DBConfig, err error) {
+	c = &DBConfig{}
+	err = json.Unmarshal([]byte(s), c)
+	if err != nil {
+		return nil, err
+	}
+	return c, nil
+}
+
 type ExecutorSQL struct {
 	dbConfig  DBConfig
 	sshConfig *sshmysql.SSHConfig
