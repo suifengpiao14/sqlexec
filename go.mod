@@ -9,7 +9,7 @@ require (
 	github.com/pkg/errors v0.9.1
 	github.com/spf13/cast v1.5.1
 	github.com/stretchr/testify v1.8.4
-	github.com/suifengpiao14/ddl-executor v0.0.2
+	github.com/suifengpiao14/ddl-executor v0.0.3
 	github.com/suifengpiao14/funcs v0.0.18
 	github.com/suifengpiao14/logchan/v2 v2.0.22
 	github.com/suifengpiao14/sshmysql v0.0.1
@@ -29,11 +29,10 @@ require (
 	github.com/jfcote87/sshdb v0.5.3 // indirect
 	github.com/juju/errors v0.0.0-20170703010042-c7d06af17c68 // indirect
 	github.com/leodido/go-urn v1.2.4 // indirect
-	github.com/opentracing/opentracing-go v1.0.2 // indirect
 	github.com/pingcap/errors v0.11.4 // indirect
 	github.com/pingcap/log v0.0.0-20190715063458-479153f07ebd // indirect
 	github.com/pingcap/parser v3.1.2+incompatible // indirect
-	github.com/pingcap/tidb v0.0.0-20190912055946-5c48d93368d4 // indirect
+	github.com/pingcap/tidb v0.0.0-20190929123532-694e086e7914 // indirect
 	github.com/pingcap/tipb v0.0.0-20240227061755-3670eddec8d6 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
 	github.com/remyoudompheng/bigfft v0.0.0-20230129092748-24d4a6f8daec // indirect
