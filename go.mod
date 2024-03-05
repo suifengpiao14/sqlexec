@@ -12,7 +12,7 @@ require (
 	github.com/suifengpiao14/ddl-executor v0.0.3
 	github.com/suifengpiao14/funcs v0.0.18
 	github.com/suifengpiao14/logchan/v2 v2.0.22
-	github.com/suifengpiao14/sshmysql v0.0.1
+	github.com/suifengpiao14/sshmysql v0.0.3
 	github.com/tidwall/gjson v1.17.0
 	golang.org/x/sync v0.6.0
 	gorm.io/gorm v1.25.5
