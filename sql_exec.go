@@ -39,7 +39,19 @@ func JsonToDBConfig(s string) (c *DBConfig, err error) {
 	if err != nil {
 		return nil, err
 	}
+	err = c.Validate()
+	if err != nil {
+		return nil, err
+	}
 	return c, nil
+}
+
+func (dbConfig DBConfig) Validate() (err error) {
+	if dbConfig.DSN == "" {
+		err = errors.Errorf("DBConfig.DSN required")
+		return err
+	}
+	return nil
 }
 
 type ExecutorSQL struct {
