@@ -85,10 +85,8 @@ const (
 
 // TryExecDDLs 尝试解析ddls,其中,包含数据库不存在情况,自动创建
 func TryExecDDLs(ddls string) (db *executor.Executor, err error) {
-	//ddls = RemoveComments(ddls) // 'xxx#xx' 单引号中的# 有问题，这个地方感觉无需要去除注释，暂时注释，后续需要再完善
 	conf := executor.NewDefaultConfig()
 	db = executor.NewExecutor(conf)
-	ddls = strings.Join(strings.Fields(ddls), " ")
 	sqls := splitDDLStatements(ddls)
 	for _, sql := range sqls {
 		if sql == "" {
