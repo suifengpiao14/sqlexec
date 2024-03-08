@@ -64,6 +64,10 @@ type ExecutorSQL struct {
 	once      sync.Once
 }
 
+func (e *ExecutorSQL) TypeName() string {
+	return "ExecutorSQL"
+}
+
 func NewExecutorSQL(dbConfig DBConfig, sshConfig *sshmysql.SSHConfig) (e *ExecutorSQL) {
 	return &ExecutorSQL{
 		dbConfig:  dbConfig,
