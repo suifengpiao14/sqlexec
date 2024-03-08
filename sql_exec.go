@@ -32,10 +32,14 @@ type DBConfig struct {
 	MaxIdleTime int    `json:"maxIdleTime"`
 }
 
+var (
+	ERROR_EMPTY_CONFIG = errors.New("empty db config")
+)
+
 //JsonToDBConfig 内置将json字符串转为DBConfig
 func JsonToDBConfig(s string) (c *DBConfig, err error) {
 	if strings.TrimSpace(s) == "" {
-		return nil, nil
+		return nil, ERROR_EMPTY_CONFIG
 	}
 	c = &DBConfig{}
 	err = json.Unmarshal([]byte(s), c)
