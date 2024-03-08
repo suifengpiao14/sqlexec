@@ -34,6 +34,9 @@ type DBConfig struct {
 
 //JsonToDBConfig 内置将json字符串转为DBConfig
 func JsonToDBConfig(s string) (c *DBConfig, err error) {
+	if strings.TrimSpace(s) == "" {
+		return nil, nil
+	}
 	c = &DBConfig{}
 	err = json.Unmarshal([]byte(s), c)
 	if err != nil {
