@@ -1,5 +1,5 @@
 create database `xyxz_manage_db` CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci;;
-
+-- 备注
 CREATE TABLE `t_xyxz_uniform_config` (
   `Fid` bigint(20) unsigned NOT NULL AUTO_INCREMENT COMMENT '自增ID',
   `Fapp` varchar(100) NOT NULL DEFAULT '' COMMENT '程序',
